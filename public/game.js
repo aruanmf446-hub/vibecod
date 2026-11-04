@@ -4,6 +4,8 @@
   const app = $("app"), canvas = $("battle"), ctx = canvas.getContext("2d");
   const W = canvas.width, H = canvas.height;
   const socket = io();
+  const characters = window.BattleCharacters;
+  const appearanceIndex = { yellow: 0, blue: 0 };
   let state = null;
   let sprites = [], particles = [], rings = [];
   let tick = 0;
@@ -77,7 +79,10 @@
   });
   function rnd(min, max) { return min + Math.random() * (max - min); }
   function spawn(team, idle) {
-    sprites.push({ team, type: Math.floor(Math.random() * 4),
+    const roster = characters.teams[team];
+    const visualSlot = appearanceIndex[team]++;
+    const appearance = roster[visualSlot % roster.length];
+    sprites.push({ team, appearance, visualSlot,
       x: team === "yellow" ? rnd(64, 135) : rnd(405, 475),
       y: rnd(425, 478), start: performance.now(), idle, phase: rnd(0, Math.PI * 2),
       speed: rnd(1.5, 2.6), ttl: idle ? 999999 : 220 + rnd(0, 80) });
@@ -169,29 +174,10 @@
         return false;
       }
     }
-    const x = sprite.x, y = sprite.y + Math.sin(tick * .17 + sprite.phase) * 2;
-    ctx.save(); ctx.translate(x, y); if (!left) ctx.scale(-1, 1);
-    ctx.fillStyle = "#0006"; ctx.beginPath(); ctx.ellipse(0, 1, 14, 4, 0, 0, 7); ctx.fill();
-    ctx.fillStyle = p[2]; ctx.fillRect(-5, -11, 5, 13); ctx.fillRect(2, -11, 5, 13);
-    ctx.fillStyle = sprite.type === 1 ? "#f9fafb" : p[0]; ctx.fillRect(-10, -29, 20, 20);
-    ctx.fillStyle = sprite.type === 2 ? "#263454" : p[2]; ctx.fillRect(-12, -45, 24, 18);
-    ctx.fillStyle = p[1]; ctx.fillRect(-9, -40, 18, 3);
-    ctx.fillStyle = "#ecfaff"; ctx.fillRect(-8, -35, 6, 3); ctx.fillRect(3, -35, 6, 3);
-    ctx.fillStyle = p[0]; ctx.fillRect(-14, -27, 5, 16); ctx.fillRect(9, -27, 5, 16);
-    if (sprite.type === 0) { // escudo original
-      ctx.fillStyle = p[1]; ctx.beginPath(); ctx.arc(15, -19, 9, 0, 7); ctx.fill();
-      ctx.fillStyle = p[2]; star(15, -19, 4, p[2]);
-    } else if (sprite.type === 1) {
-      ctx.fillStyle = "#d5e4ff"; ctx.fillRect(-7, -47, 14, 4);
-      ctx.fillStyle = p[1]; ctx.fillRect(13, -18, 12, 3);
-    } else if (sprite.type === 2) {
-      ctx.fillStyle = p[1]; ctx.fillRect(-11, -54, 4, 10); ctx.fillRect(7, -54, 4, 10);
-    } else {
-      ctx.fillStyle = "#dbeaff"; star(0, -22, 5, "#dbeaff");
-      ctx.fillStyle = p[1]; ctx.fillRect(12, -24, 8, 12);
-    }
-    ctx.restore(); return true;
+    characters.draw(ctx, sprite, tick, state?.winner);
+    return true;
   }
+
   function frame() {
     requestAnimationFrame(frame); tick++;
     sky();

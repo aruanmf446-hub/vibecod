@@ -1,0 +1,16 @@
+{
+  "results": [
+    "6 controles locais: Flor, Rosa, +150 de ambos os times, likes e reinício; HP, pontos, energia e ranking corretos",
+    "360x640: sem overflow horizontal; Canvas animado",
+    "390x844: sem overflow horizontal; Canvas animado",
+    "720x1280: sem overflow horizontal; Canvas animado",
+    "768x1024: sem overflow horizontal; Canvas animado",
+    "1440x900: sem overflow horizontal; Canvas animado",
+    "Vitória pelo HP e reinício manual verificados sem conexão com a live",
+    "Carga visual até limite existente de 110 unidades: média de 32.8 ms/frame no Chromium deste ambiente",
+    "prefers-reduced-motion: renderização sem exceções",
+    "Nenhum erro de console, exceção ou request malsucedido observado"
+  ],
+  "errors": [],
+  "failed": []
+}
