@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `36c44e65f2bf` |
+| Impressão digital do código | `777946a50a17` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -120,3 +120,14 @@ Não testados: iPhone físico, 60 fps em hardware móvel, PRISM, RTMP e live rea
 ### Revisão do cenário conforme a referência aprovada
 
 O céu abstrato e o piso de grade foram substituídos por um jardim de batalha verde com muralha de pedra, bandeiras botânicas dos times, tochas, rochas, vegetação e cristais. Arte vetorial original local em `public/assets/arena/garden.svg` (36 KB), sem imagens externas. A imagem é rasterizada uma vez em cache de 2×; torres e personagens não fazem parte do fundo, e suas posições/desenhos permanecem iguais. As capturas `visual-*` foram atualizadas para esta revisão. A fila foi posicionada acima da borda de pedra.
+
+
+### Efeitos sonoros
+
+Antes não existia áudio. `public/game.js` agora sintetiza efeitos originais via Web Audio para presentes, golpes, dano à torre, derrota de unidades, curtidas, modo poder, vitória/empate e reinício. Sem downloads de áudio, bibliotecas ou música contínua. Um único AudioContext é reutilizado; há limite de 12 vozes, cooldown por efeito, volume moderado e desconexão dos nós ao terminar.
+
+O botão **Ativar som / Silenciar** libera o áudio por toque e permite interromper inclusive sons já agendados. Nada toca antes desse gesto, nem ao reconectar/recarregar. Ao ocultar a página, o áudio é interrompido; é preciso ativar de novo. Som e movimento reduzido são controles independentes.
+
+Validação adicional em Chromium: nenhum AudioContext criado antes do toque; forma de onda real medida após ativar (pico 0,0465), sons de presente e poder, silêncio sem novas vozes depois de silenciar, um único contexto reutilizado e página sem exceções ou overflow. Captura: `visual-sound.png`. `npm test` continua com 21 testes aprovados e `npm run check` passou.
+
+No iPhone, será necessário tocar em Ativar som em cada abertura. Não foi verificado se o widget Web do PRISM permite esse toque nem se sua configuração captura o áudio da página. A confirmação final precisa ser feita no PRISM/iPhone e na reprodução da live, sem presumir que áudio no Safari equivale a áudio transmitido.

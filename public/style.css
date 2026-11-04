@@ -13,3 +13,5 @@ body{display:block}#app{width:calc(100% - clamp(42px,10vw,120px));max-width:900p
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.power-active .battle-area{box-shadow:inset 0 0 24px #ffe27a20}}
 /* Keep the reinforcement caption clear of the garden's stone rim. */
 .combat-queue{top:21px}
+
+.sound-toggle{font:inherit;font-size:clamp(10px,2.7cqw,18px);font-weight:800;color:#e8f5ff;background:#243858;border:1px solid #7798c3;border-radius:6px;padding:7px 6px;min-height:32px;cursor:pointer}.sound-toggle[aria-pressed="true"]{color:#fff0a4;border-color:#ebc458}.sound-toggle:focus-visible{outline:2px solid #fff;outline-offset:2px}.timerline{gap:5px;flex-wrap:wrap}.timerline #energyFlag{font-size:clamp(8px,2.2cqw,15px)}

@@ -25,10 +25,79 @@
   window.addEventListener?.("resize", resizeCanvas);
   resizeCanvas();
   const colors = { yellow: ["#ffb323", "#ffe084", "#c57322"], blue: ["#256cdb", "#90ddff", "#154a9f"] };
+  // Small original Web Audio cues. Nothing starts before an explicit tap.
+  const sound = (() => {
+    let context = null, master = null, enabled = false;
+    const voices = new Set(), last = Object.create(null);
+    const button = $("soundToggle");
+    const cues = {
+      gift: [[660, 0, .12], [990, .1, .2]],
+      hit: [[140, 0, .055]], tower: [[80, 0, .15]],
+      defeat: [[220, 0, .09], [110, .07, .12]],
+      likes: [[520, 0, .09]],
+      power: [[330, 0, .12], [440, .1, .12], [660, .2, .25]],
+      win: [[392, 0, .16], [494, .15, .16], [587, .3, .16], [784, .45, .45]],
+      draw: [[440, 0, .2], [330, .2, .3]],
+      reset: [[440, 0, .1], [660, .12, .16]]
+    };
+    function label() {
+      const running = enabled && context?.state === "running";
+      button.textContent = running ? "Silenciar" : "Ativar som";
+      button.setAttribute?.("aria-pressed", String(Boolean(running)));
+    }
+    function stop() {
+      for (const oscillator of voices) { try { oscillator.stop(); } catch {} }
+      voices.clear();
+    }
+    async function toggle() {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) { button.textContent = "Áudio indisponível"; button.disabled = true; return; }
+      try {
+        if (!context) {
+          context = new Audio(); master = context.createGain();
+          master.gain.value = .3; master.connect(context.destination);
+          context.onstatechange = label;
+        }
+        if (enabled && context.state === "running") {
+          enabled = false; stop(); master.gain.value = 0;
+        } else {
+          await context.resume(); enabled = context.state === "running";
+          master.gain.value = enabled ? .3 : 0;
+          if (enabled) play("reset");
+        }
+        label();
+      } catch { enabled = false; label(); }
+    }
+    function play(kind) {
+      if (!enabled || context?.state !== "running" || document.hidden) return;
+      const now = performance.now(), cooldown = kind === "likes" ? 1000 : kind === "hit" ? 180 : 300;
+      if (last[kind] !== undefined && now - last[kind] < cooldown) return;
+      last[kind] = now;
+      for (const [frequency, delay, duration] of cues[kind] || []) {
+        if (voices.size >= 12) break;
+        const oscillator = context.createOscillator(), envelope = context.createGain();
+        const start = context.currentTime + delay, end = start + duration;
+        oscillator.type = kind === "hit" || kind === "tower" ? "sine" : "triangle";
+        oscillator.frequency.setValueAtTime(frequency, start);
+        oscillator.frequency.exponentialRampToValueAtTime(frequency * (kind === "hit" || kind === "tower" ? .45 : .98), end);
+        envelope.gain.setValueAtTime(0, start);
+        envelope.gain.linearRampToValueAtTime(.16, start + .008);
+        envelope.gain.exponentialRampToValueAtTime(.001, end);
+        oscillator.connect(envelope); envelope.connect(master); voices.add(oscillator);
+        oscillator.onended = () => { voices.delete(oscillator); oscillator.disconnect(); envelope.disconnect(); };
+        oscillator.start(start); oscillator.stop(end + .015);
+      }
+    }
+    button.addEventListener("click", toggle);
+    document.addEventListener?.("visibilitychange", () => {
+      if (document.hidden && context) { enabled = false; stop(); master.gain.value = 0; label(); }
+    });
+    return { play };
+  })();
   function number(value) { return Math.round(Number(value) || 0).toLocaleString("pt-BR"); }
   function update(stateArg) {
     if (state && state.battleId === stateArg.battleId) {
-      for (const team of ["yellow", "blue"]) if (stateArg.hp[team] < state.hp[team]) towerHit[team] = performance.now();
+      for (const team of ["yellow", "blue"]) if (stateArg.hp[team] < state.hp[team]) { towerHit[team] = performance.now(); sound.play("tower"); }
     }
     if (stateArg.winner && !state?.winner) victoryAt = performance.now();
     if (!stateArg.winner) victoryAt = 0;
@@ -80,6 +149,7 @@
   });
   socket.on("state", update);
   socket.on("attack", data => {
+    if (data.kind === "gift") sound.play("gift");
     if (data.kind === "gift") {
       const notice = $("giftNotice");
       notice.replaceChildren();
@@ -93,10 +163,10 @@
       color: data.team === "yellow" ? "#fbd871" : "#7fd7ff" });
     if (rings.length > 20) rings.shift();
   });
-  socket.on("likes", () => { for (let i = 0; i < 8; i++) spark(270, 220, "#c7d5ff"); });
-  socket.on("power", () => { for (let i = 0; i < 35; i++) spark(270, 330, "#ffed94"); });
-  socket.on("win", () => { for (let i = 0; i < 90; i++) spark(Math.random() * W, Math.random() * 200 + 50, i % 2 ? "#f9c952" : "#7fbaff"); });
-  socket.on("reset", () => { sprites.clear(); fallen = []; particlePool.push(...particles); particles = []; rings = []; damageLabels.length = 0; sceneId = null; $("giftNotice").hidden = true; });
+  socket.on("likes", () => { sound.play("likes"); for (let i = 0; i < 8; i++) spark(270, 220, "#c7d5ff"); });
+  socket.on("power", () => { sound.play("power"); for (let i = 0; i < 35; i++) spark(270, 330, "#ffed94"); });
+  socket.on("win", data => { sound.play(data.winner === "draw" ? "draw" : "win"); for (let i = 0; i < 90; i++) spark(Math.random() * W, Math.random() * 200 + 50, i % 2 ? "#f9c952" : "#7fbaff"); });
+  socket.on("reset", () => { sound.play("reset"); sprites.clear(); fallen = []; particlePool.push(...particles); particles = []; rings = []; damageLabels.length = 0; sceneId = null; $("giftNotice").hidden = true; });
   document.querySelectorAll("[data-action]").forEach(button => {
     button.addEventListener("click", async () => {
       button.disabled = true;
@@ -117,6 +187,7 @@
       present.add(unit.id);
       const appearance = characters.teams[unit.team][unit.appearance % characters.teams[unit.team].length];
       const previous = sprites.get(unit.id);
+      if (previous && unit.hp < previous.hp) sound.play("hit");
       if (previous && unit.hp < previous.hp && !reducedMotion.matches) {
         if (damageLabels.length < 24) damageLabels.push({ x: unit.x, y: unit.y - 58, value: previous.hp - unit.hp, until: now + 650 });
         for (let k = 0; k < 2; k++) spark(unit.x, unit.y - 20, appearance.accent);
@@ -126,6 +197,7 @@
         receivedAt: now, serverTime: data.combat.time });
     }
     for (const [id, unit] of sprites) if (!present.has(id)) {
+      sound.play("defeat");
       fallen.push({ ...unit, defeated: true, deathAt: now });
       for (let k = 0; k < 3; k++) spark(unit.x, unit.y - 20, unit.appearance.accent);
       sprites.delete(id);
