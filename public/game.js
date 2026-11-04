@@ -14,6 +14,8 @@
   const damageLabels = [];
   const towerHit = { yellow: 0, blue: 0 };
   let giftUntil = 0, victoryAt = 0, confettiAt = 0;
+  const announcementQueue = [];
+  let nextAnnouncementAt = 0;
   function resizeCanvas() {
     const ratio = Math.min(2, window.devicePixelRatio || 1);
     if (!canvas.getBoundingClientRect) return;
@@ -148,16 +150,19 @@
     update(data);
   });
   socket.on("state", update);
+  socket.on("announcement", data => {
+    if (data.team !== "yellow" && data.team !== "blue") return;
+    if (data.kind === "comment" && !$("readComments").checked) return;
+    if (announcementQueue.length >= 8) {
+      const index = announcementQueue.findIndex(item => item.kind === "comment");
+      if (index >= 0) announcementQueue.splice(index, 1);
+      else if (data.kind === "comment") return;
+      else announcementQueue.shift();
+    }
+    announcementQueue.push(data);
+  });
   socket.on("attack", data => {
     if (data.kind === "gift") sound.play("gift");
-    if (data.kind === "gift") {
-      const notice = $("giftNotice");
-      notice.replaceChildren();
-      const title = document.createElement("strong"); title.textContent = data.name;
-      const detail = document.createElement("small"); detail.textContent = data.gift + " · +" + data.count + " combatentes";
-      notice.append(title, detail); notice.classList.toggle("blue", data.team === "blue");
-      notice.hidden = false; giftUntil = performance.now() + 3200;
-    }
     if (reducedMotion.matches) return;
     rings.push({ x: data.team === "yellow" ? 151 : 389, y: 398, life: 35,
       color: data.team === "yellow" ? "#fbd871" : "#7fd7ff" });
@@ -281,6 +286,17 @@
     requestAnimationFrame(frame); tick++;
     const delta = Math.min(100, Math.max(0, now - lastFrame)); lastFrame = now;
     if (reducedMotion.matches) { tick = 0; particlePool.push(...particles); particles.length = 0; rings.length = 0; damageLabels.length = 0; }
+    if (now >= nextAnnouncementAt && announcementQueue.length) {
+      const data = announcementQueue.shift();
+      if (data.kind !== "comment" || $("readComments").checked) {
+        $("announcerPortrait").src = "/assets/announcers/" + data.team + ".png";
+        $("announcerName").textContent = data.name;
+        $("announcerMessage").textContent = data.speech;
+        $("announcerDetail").textContent = data.kind === "gift" ? "+" + data.count + " reforços · " + data.gift : "COMENTÁRIO DA LIVE";
+        $("giftNotice").classList.toggle("blue", data.team === "blue");
+        giftUntil = now + 5000; nextAnnouncementAt = now + 5500;
+      }
+    }
     $("giftNotice").hidden = now > giftUntil;
     const countdown = $("victoryCountdown");
     countdown.hidden = !state?.winner;

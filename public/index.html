@@ -32,12 +32,16 @@
       <div id="combatQueue" class="combat-queue">Envie Flor ou Rosa para invocar combatentes</div>
       <canvas id="battle" width="540" height="650" role="img" aria-label="Arena animada com duas torres e pequenos super-heróis fanmade"></canvas>
       <div class="center-versus" aria-hidden="true">VS</div>
-      <div id="giftNotice" class="gift-notice" role="status" hidden></div>
+      <div id="giftNotice" class="gift-notice announcer" role="status" hidden>
+        <img id="announcerPortrait" src="/assets/announcers/yellow.png" alt="" width="80" height="90">
+        <div class="speech-bubble"><strong id="announcerName"></strong><span id="announcerMessage"></span><small id="announcerDetail"></small></div>
+      </div>
       <div id="victoryCountdown" class="victory-countdown" hidden></div>
       <div id="winBanner" class="win-banner" hidden></div>
       <div id="toast" class="toast">Escolha seu time no chat e entre na batalha!</div>
     </div>
     <div class="power-strip"><div><b>⚡ ENERGIA DA LIVE</b><span id="energyText">0%</span></div><div class="power-track"><div id="energyFill"></div></div></div>
+    <div class="comment-controls"><label class="comment-reading"><input id="readComments" type="checkbox"> Mostrar comentários</label></div>
     <section class="instructions">
       <div class="guide yellow-guide"><div class="gift">🌼</div><div><strong>FLOR = VINGADORES</strong><small>Digite 1 para entrar no time amarelo</small></div></div>
       <div class="guide blue-guide"><div class="gift">🌹</div><div><strong>ROSA = X-MEN</strong><small>Digite 2 para entrar no time azul</small></div></div>

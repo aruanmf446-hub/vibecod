@@ -6,12 +6,13 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Battle, COMBAT, reinforcementCount } from '../battle.mjs';
+import { createAnnouncer } from '../announcer.mjs';
 function harness(env={}) {
   let now=10000, id=0;const timers=[],intervals=[],emissions=[],connections=[],routes={};
   const app={use(){},get(name,fn){routes[name]=fn},post(name,fn){routes[name]=fn}};
   const express=()=>app;express.json=()=>{};express.static=()=>{};
   class Live extends EventEmitter { constructor(){super();connections.push(this)}async connect(){} }
-  const sandbox={Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
+  const sandbox={createAnnouncer,Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
     Server:class{on(){}emit(name,data){emissions.push({name,data})}},fileURLToPath,path,
     randomUUID:()=>String(++id),process:{env},console:{log(){},warn(){}},
     TikTokLiveConnection:Live,Date:class extends Date{constructor(...a){super(...(a.length?a:[now]))}static now(){return now}},performance:{now:()=>now},
@@ -88,4 +89,16 @@ test('simulador fica bloqueado em hospedagem e atrás de proxy, mesmo vindo de 1
   const proxied=harness();
   assert.equal(call(proxied,{'x-forwarded-for':'203.0.113.9'}),403);assert.equal(proxied.publicState().units.yellow,0);
   assert.equal(call(proxied,{}),200);assert.equal(proxied.publicState().units.yellow,1);
+});
+
+test('balões de presentes não duplicam combos; comentários não mudam regras',()=>{
+ const h=harness();h.receiveGift({...gift(),giftType:1,repeatEnd:false});
+ assert.equal(h.emissions.filter(e=>e.name==='announcement').length,0);
+ h.receiveGift({...gift('Rose'),giftType:1,repeatEnd:true});
+ const notice=h.emissions.find(e=>e.name==='announcement');
+ assert.equal(notice.data.team,'blue');assert.match(notice.data.speech,/rosa.*X-Men/);
+ const before=JSON.stringify(h.publicState().units);
+ h.receiveChat({user:{uniqueId:'donor',nickname:'Lucas'},comment:'Vamos ganhar!'});
+ assert.equal(JSON.stringify(h.publicState().units),before);
+ assert.ok(h.emissions.some(e=>e.name==='announcement'&&e.data.kind==='comment'));
 });

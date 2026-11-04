@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { createAnnouncer } from "./announcer.mjs";
 import { randomUUID } from "node:crypto";
 import { Battle, COMBAT, reinforcementCount } from "./battle.mjs";
 import { buildInfo } from "./version.mjs";
@@ -15,6 +16,9 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 const root = path.dirname(fileURLToPath(import.meta.url));
+const announce = createAnnouncer({ emit: (event, data) => io.emit(event, data),
+  apiKey: process.env.GROQ_API_KEY || "", model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile" });
+let lastSpokenComment = 0;
 const LIMIT = 1200;
 const AUTO_RESTART = process.env.AUTO_RESTART !== "false";
 const teamOf = new Map();
@@ -150,12 +154,19 @@ function receiveGift(raw) {
   const name = giftName(raw);
   const team = teamFromGift(name) || teamFor(person.id);
   const diamonds = giftValue(raw);
+  announce({ kind: "gift", team, name: person.name, gift: name,
+    count: reinforcementCount(Math.max(8, Math.min(450, diamonds * 8)), "gift") });
   // Uma flor/rosa invoca reforços; presentes maiores adicionam mais combatentes.
   strike(team, person, Math.max(8, Math.min(450, diamonds * 8)), "gift", name);
 }
 function receiveChat(raw) {
   const person = actor(raw);
   const team = teamFromChat(raw?.comment ?? raw?.text);
+  const commentTime = Date.now();
+  if (commentTime - lastSpokenComment >= 5000) {
+    lastSpokenComment = commentTime;
+    announce({ kind: "comment", team: team || teamFor(person.id), name: person.name, message: raw?.comment ?? raw?.text });
+  }
   if (!team) return;
   teamOf.set(person.id, team);
   const now = Date.now();

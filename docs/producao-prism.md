@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `777946a50a17` |
+| Impressão digital do código | `1a1b9705b51e` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -131,3 +131,16 @@ O botão **Ativar som / Silenciar** libera o áudio por toque e permite interrom
 Validação adicional em Chromium: nenhum AudioContext criado antes do toque; forma de onda real medida após ativar (pico 0,0465), sons de presente e poder, silêncio sem novas vozes depois de silenciar, um único contexto reutilizado e página sem exceções ou overflow. Captura: `visual-sound.png`. `npm test` continua com 21 testes aprovados e `npm run check` passou.
 
 No iPhone, será necessário tocar em Ativar som em cada abertura. Não foi verificado se o widget Web do PRISM permite esse toque nem se sua configuração captura o áudio da página. A confirmação final precisa ser feita no PRISM/iPhone e na reprodução da live, sem presumir que áudio no Safari equivale a áudio transmitido.
+
+
+### Personagem com balão — narração externa pendente
+
+O pedido seguinte acrescentou um apresentador em PNG e balões de agradecimento/comentário. Após consultar https://console.groq.com/docs/text-to-speech (vozes documentadas em inglês e árabe, sem português), o usuário escolheu **serviço externo em português, com provedor a definir depois**. Portanto NÃO foi ativada voz de navegador nem integração TTS provisória. Os efeitos sonoros anteriores continuam separados. O balão mostra texto, mas ainda não fala nem movimenta a boca como se estivesse falando.
+
+- `public/assets/announcers/yellow.png` e `blue.png`: exportações transparentes dos personagens originais já existentes, herói tecnológico e soldado óptico.
+- `announcer.mjs`: agradecimento local pelo nome/presente/time. Opcionalmente, `GROQ_API_KEY` e `GROQ_MODEL` no servidor permitem ao Groq selecionar entre três frases locais de torcida. O modelo não altera o texto livre do comentário, não controla a batalha e não recebe o nome do participante. Uma requisição no máximo a cada 10 segundos, uma simultânea, timeout de 2 segundos e fallback local em falhas. Nenhum endpoint de geração foi exposto ao público; espectadores adicionais não multiplicam chamadas.
+- `server.mjs`: apenas emite eventos adicionais de apresentação para presentes completos e amostra comentários a cada 5 segundos. Contagem de combo, times, HP, invocações, regras e conexão permanecem iguais. Presentes durante comemoração recebem agradecimento no recebimento, sem repetir quando a batalha reinicia.
+- Cliente: fila de 8 balões, 5 segundos cada, prioriza presentes e descarta avisos antigos em excesso sem descartar unidades/doações do jogo. Comentários só aparecem ao marcar Mostrar comentários, inicialmente desligado. Texto é exibido com textContent, sem HTML executável; nomes/textos são limitados e controles/URLs removidos. Comentários crus não passam por moderação semântica: o operador decide habilitar a exibição.
+- Não configurar chave no HTML/JS público; somente variável do servidor. Sem chave, as frases locais funcionam e nenhuma API é chamada. A API real Groq não foi exercitada nesta etapa por falta de credencial: testes usaram respostas simuladas, incluindo falhas, saída inválida e limite de chamadas.
+
+Validação: 27 testes passaram, npm run check e node --check announcer.mjs passaram. QA de batalha completo passou; teste adicional com presentes reais do simulador conferiu Rosa → retrato azul/X-Men e Flor → amarelo/Vingadores, sem overflow ou exceções. Captura nova: visual-announcer.png. Para terminar a fala, escolher provedor TTS em português, configurar credencial somente no servidor e verificar desbloqueio/captura de áudio no iPhone/PRISM. Sem publicação no Render.
