@@ -22,8 +22,12 @@ Para conectar a LIVE, copie `.env.exemplo` para `.env`, preencha `TIKTOK_USERNAM
 - Placar e ranking continuam contando o apoio recebido; o dano das torres acontece durante o combate, não na chegada do presente.
 - Sem OBS para rodar o **jogo**; a transmissão de vídeo ainda precisa ser publicada por algum sistema de LIVE (TikTok LIVE Studio/RTMP/serviço de streaming). Só o servidor Node não inicia uma transmissão.
 
+## Live real (PRISM no iPhone)
+O iPhone precisa abrir o jogo pelo IP do computador (`http://IP-DO-PC:3000`), não por `localhost`. Para saber qual versão está rodando, abra `/api/health`. Passo a passo completo e roteiro de teste: [docs/producao-prism.md](docs/producao-prism.md).
+
 ## Arquivos
 - `server.mjs`: Socket.IO, ciclo da batalha e recepção dos eventos TikTok
+- `version.mjs`: commit e impressão digital do código exibidos em `/api/health`
 - `battle.mjs`: movimento, filas, duelos, HP individual e ataques às torres
 - `public/index.html`, `public/style.css`, `public/game.js`: jogo visual
 - `INICIAR.bat`: iniciação automática no Windows

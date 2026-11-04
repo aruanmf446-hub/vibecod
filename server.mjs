@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { Battle, COMBAT, reinforcementCount } from "./battle.mjs";
+import { buildInfo } from "./version.mjs";
 import express from "express";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -27,6 +28,16 @@ let restartTimer = null;
 let pendingReinforcements = [];
 let match = freshMatch();
 let lastNews = "A batalha vai começar!";
+const build = buildInfo(root);
+// Contadores apenas de eventos vindos da LIVE real (o simulador local não conta aqui).
+const live = { gifts: 0, chats: 0, likes: 0, lastEventAt: null, lastGift: null, connectedAt: null };
+function fromLive(kind, handler) {
+  return raw => {
+    live[kind] += 1; live.lastEventAt = new Date().toISOString();
+    if (kind === "gifts") live.lastGift = { name: giftName(raw), diamonds: giftValue(raw), at: live.lastEventAt };
+    handler(raw);
+  };
+}
 
 function freshMatch() {
   return {
@@ -172,7 +183,10 @@ function receiveLikes(raw) {
 }
 app.use(express.json({ limit: "8kb" }));
 app.use(express.static(path.join(root, "public")));
-app.get("/api/health", (_req, res) => res.json({ ok: true, configured: !!USERNAME, connected: match.connected, battleId: match.battleId }));
+app.get("/api/health", (_req, res) => res.json({
+  ok: true, configured: !!USERNAME, connected: match.connected, battleId: match.battleId,
+  status: match.status, units: match.units, hp: match.hp, build, live
+}));
 // Simulação apenas para navegador no próprio computador, nunca liberada na internet.
 function isLocal(req) {
   return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress);
@@ -215,9 +229,9 @@ async function connectLive() {
   try {
     currentConnection = new TikTokLiveConnection(USERNAME, { enableExtendedGiftInfo: true });
     const connection = currentConnection;
-    connection.on("gift", receiveGift);
-    connection.on("chat", receiveChat);
-    connection.on("like", receiveLikes);
+    connection.on("gift", fromLive("gifts", receiveGift));
+    connection.on("chat", fromLive("chats", receiveChat));
+    connection.on("like", fromLive("likes", receiveLikes));
     connection.on("roomUser", data => {
       match.viewers = Math.max(0, Number(data?.viewerCount || data?.totalUser || 0));
       publish();
@@ -233,6 +247,7 @@ async function connectLive() {
     connection.on("error", err => console.warn("TikTok:", err?.message || err));
     await connection.connect();
     match.connected = true;
+    live.connectedAt = new Date().toISOString();
     lastNews = "TikTok LIVE conectada! @" + USERNAME;
     console.log("TikTok LIVE conectada: @" + USERNAME);
     publish();
@@ -253,6 +268,8 @@ function scheduleReconnect() {
 }
 httpServer.listen(PORT, () => {
   console.log("Jogo: http://localhost:" + PORT);
+  console.log("Versão: commit " + (build.commit ? build.commit.slice(0, 7) : "desconhecido (sem .git)") +
+    " | impressão digital " + build.fingerprint + " | conferir em /api/health");
   console.log("Simulação: use os botões na própria tela em localhost.");
   connectLive();
 });

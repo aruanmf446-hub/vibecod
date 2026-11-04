@@ -11,10 +11,10 @@ function harness(env={}) {
   const app={use(){},get(name,fn){routes[name]=fn},post(name,fn){routes[name]=fn}};
   const express=()=>app;express.json=()=>{};express.static=()=>{};
   class Live extends EventEmitter { constructor(){super();connections.push(this)}async connect(){} }
-  const sandbox={Battle,COMBAT,reinforcementCount,express,createServer:()=>({listen(){}}),
+  const sandbox={Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
     Server:class{on(){}emit(name,data){emissions.push({name,data})}},fileURLToPath,path,
     randomUUID:()=>String(++id),process:{env},console:{log(){},warn(){}},
-    TikTokLiveConnection:Live,Date:{now:()=>now},performance:{now:()=>now},
+    TikTokLiveConnection:Live,Date:class extends Date{constructor(...a){super(...(a.length?a:[now]))}static now(){return now}},performance:{now:()=>now},
     setTimeout:(fn,delay)=>{const timer={fn,delay,cancelled:false};timers.push(timer);return timer},
     clearTimeout:timer=>{if(timer)timer.cancelled=true},setInterval:fn=>intervals.push(fn)};
   const source=readFileSync(new URL('../server.mjs',import.meta.url),'utf8')
@@ -68,4 +68,15 @@ test('chat atribui time e presentes genéricos o seguem; likes preservam a energ
   h.receiveLikes({likeCount:50});assert.equal(h.publicState().energy,30);
   for(let i=0;i<3;i++)h.receiveLikes({likeCount:50});
   assert.ok(h.publicState().powerUntil>0);
+});
+test('/api/health informa versão e conta só presentes vindos da LIVE real',async()=>{
+  const h=harness({TIKTOK_USERNAME:'canal'});await h.connectLive();
+  const health=()=>{let body;h.routes['/api/health']({}, {json:b=>{body=b}});return body;};
+  h.routes['/api/demo']({socket:{remoteAddress:'127.0.0.1'},body:{action:'flower'}},{json(){},status(){return this}});
+  assert.equal(health().live.gifts,0);assert.equal(health().units.yellow,1);
+  h.connections[0].emit('gift',gift('Rose',3));
+  const body=health();
+  assert.equal(body.build.fingerprint,'teste');assert.equal(body.connected,true);
+  assert.equal(body.live.gifts,1);assert.equal(body.live.lastGift.name,'Rose');assert.equal(body.live.lastGift.diamonds,3);
+  assert.equal(body.units.blue,3);assert.ok(body.live.connectedAt);
 });
