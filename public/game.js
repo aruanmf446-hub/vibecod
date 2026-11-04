@@ -151,39 +151,17 @@
     for (let x = 0; x <= W + 20; x += 20) ctx.lineTo(x, y + Math.sin(x * .017 + rise) * 22 + Math.cos(x * .031 + rise) * 12);
     ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
   }
+  const arenaArtwork = window.Image ? new window.Image() : null;
+  if (arenaArtwork) arenaArtwork.src = "/assets/arena/garden.svg";
   function sky() {
     if (sky.cache) { ctx.drawImage(sky.cache, 0, 0, W, H); return; }
-    const grad = ctx.createLinearGradient(0, 0, 0, H);
-    grad.addColorStop(0, "#121d39"); grad.addColorStop(.55, "#213b6b"); grad.addColorStop(1, "#111a34");
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-    const sun = ctx.createRadialGradient(270, 310, 3, 270, 310, 300);
-    sun.addColorStop(0, "#c4d1fa26"); sun.addColorStop(1, "#617cc400");
-    ctx.fillStyle = sun; ctx.fillRect(0, 0, W, 520);
-    for (let i = 0; i < 42; i++) {
-      const x = ((i * 1237) % 517) + 10, y = ((i * 139) % 260) + 25;
-      ctx.globalAlpha = .3 + .3 * Math.sin(tick * .022 + i * 13);
-      star(x, y, 1.8, "#daeaff");
+    if (!arenaArtwork?.complete || !arenaArtwork.naturalWidth) {
+      ctx.fillStyle = "#356338"; ctx.fillRect(0, 0, W, H); return;
     }
-    ctx.globalAlpha = 1;
-    hill("#1d3657", 370, 0.4); hill("#162f46", 403, 1.2);
-    const light = ctx.createLinearGradient(0, 310, W, 480);
-    light.addColorStop(0, "#ffd56b16"); light.addColorStop(.5, "#74c8df08"); light.addColorStop(1, "#6dbfff20");
-    ctx.fillStyle = light; ctx.fillRect(0, 300, W, 180);
-    ctx.fillStyle = "#172541"; ctx.fillRect(0, 471, W, 179);
-    ctx.fillStyle = "#263b5b"; ctx.fillRect(0, 470, W, 5);
-    for (let i = 0; i < 35; i++) {
-      const x = i * 17;
-      ctx.fillStyle = i % 3 ? "#293c5a" : "#203250";
-      ctx.fillRect(x, 505 + (i % 5) * 7, 11, 3);
-    }
-    ctx.strokeStyle = "#6385b51c"; ctx.lineWidth = 2;
-    for (let x = -200; x < 800; x += 80) { ctx.beginPath(); ctx.moveTo(270, 476); ctx.lineTo(x, H); ctx.stroke(); }
-    for (let y = 492; y < H; y += (y - 457) * .19) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
-    }
+    ctx.drawImage(arenaArtwork, 0, 0, W, H);
     sky.cache = document.createElement("canvas");
-    sky.cache.width = W; sky.cache.height = H;
-    sky.cache.getContext("2d").drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, W, H);
+    sky.cache.width = W * 2; sky.cache.height = H * 2;
+    sky.cache.getContext("2d").drawImage(arenaArtwork, 0, 0, W * 2, H * 2);
   }
   function tower(team) {
     const left = team === "yellow"; const x = left ? 56 : 416;
@@ -243,7 +221,7 @@
     }
     sky();
     // Raio central decorativo, separação de campo.
-    ctx.save(); ctx.strokeStyle = "#bdd4ff25"; ctx.setLineDash([8, 15]); ctx.lineWidth = 2;
+    ctx.save(); ctx.strokeStyle = "#d5edb212"; ctx.setLineDash([8, 15]); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(270, 145); ctx.lineTo(270, 470); ctx.stroke(); ctx.restore();
     tower("yellow"); tower("blue");
     for (const sprite of sprites.values()) hero(sprite, now, delta);

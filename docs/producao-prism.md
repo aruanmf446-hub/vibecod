@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `861880f207f5` |
+| Impressão digital do código | `36c44e65f2bf` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -115,3 +115,8 @@ Canvas com densidade limitada a 2, cenário estático em cache, partículas reap
 QA: `npm run check`, 21 testes e script existente `scripts/verify-characters.cjs`. Capturas novas em `visual-390x844.png`, `visual-720x1280.png`, `visual-1080x1920.png` e `visual-ip.png`; comparar com `duels-mobile.png`, `duels-arena.png` e `prism-iphone-ip.png`, mantidos sem alteração. Nas três resoluções, o limite inferior da arena ficou em 472/813/1093 px, abaixo dos limites seguros estimados de 591/896/1344 px. A margem é uma aproximação: a sobreposição do TikTok varia com aparelho e modo de captura.
 
 Não testados: iPhone físico, 60 fps em hardware móvel, PRISM, RTMP e live real. Sem deploy ou merge automático. A impressão digital da tabela acima corresponde à proposta visual, não à versão atualmente transmitida.
+
+
+### Revisão do cenário conforme a referência aprovada
+
+O céu abstrato e o piso de grade foram substituídos por um jardim de batalha verde com muralha de pedra, bandeiras botânicas dos times, tochas, rochas, vegetação e cristais. Arte vetorial original local em `public/assets/arena/garden.svg` (36 KB), sem imagens externas. A imagem é rasterizada uma vez em cache de 2×; torres e personagens não fazem parte do fundo, e suas posições/desenhos permanecem iguais. As capturas `visual-*` foram atualizadas para esta revisão. A fila foi posicionada acima da borda de pedra.
