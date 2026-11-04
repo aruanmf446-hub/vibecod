@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `5c64fa556bef` |
+| Impressão digital do código | `e427647504b9` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -66,6 +66,8 @@ Nos dois casos, o endereço **não** pode ser `localhost`. No iPhone, `localhost
 Fora da rede de casa (4G ou outro Wi-Fi), o iPhone não alcança o computador. Nesse caso, seria preciso hospedar o servidor num serviço com processo Node sempre ligado (por exemplo Render, Railway ou Fly.io). Isso ainda não foi feito.
 
 Pelo IP, a página **não mostra** os botões de simulação, e o `/api/demo` responde 403. Só o computador local vê o simulador.
+
+No Render (variável `RENDER`, definida pelo próprio Render) ou em qualquer requisição que chegue por proxy (`X-Forwarded-For`), o simulador fica sempre desligado. Para desligar em outra hospedagem, use `DISABLE_DEMO=true`. Motivo: na primeira publicação no Render, o proxy do host conectava como endereço local e os botões de simulação ficavam abertos para qualquer pessoa.
 
 ## Como os presentes reais chegam à batalha
 

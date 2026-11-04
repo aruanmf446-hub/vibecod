@@ -80,3 +80,12 @@ test('/api/health informa versão e conta só presentes vindos da LIVE real',asy
   assert.equal(body.live.gifts,1);assert.equal(body.live.lastGift.name,'Rose');assert.equal(body.live.lastGift.diamonds,3);
   assert.equal(body.units.blue,3);assert.ok(body.live.connectedAt);
 });
+test('simulador fica bloqueado em hospedagem e atrás de proxy, mesmo vindo de 127.0.0.1',()=>{
+  const call=(h,headers)=>{let code=200;h.routes['/api/demo']({socket:{remoteAddress:'127.0.0.1'},headers,body:{action:'flower'}},
+    {json(){},status(c){code=c;return this}});return code;};
+  const hosted=harness({RENDER:'true'});
+  assert.equal(call(hosted,{}),403);assert.equal(hosted.publicState().units.yellow,0);
+  const proxied=harness();
+  assert.equal(call(proxied,{'x-forwarded-for':'203.0.113.9'}),403);assert.equal(proxied.publicState().units.yellow,0);
+  assert.equal(call(proxied,{}),200);assert.equal(proxied.publicState().units.yellow,1);
+});

@@ -188,9 +188,15 @@ app.get("/api/health", (_req, res) => res.json({
   status: match.status, units: match.units, hp: match.hp, build, live
 }));
 // Simulação apenas para navegador no próprio computador, nunca liberada na internet.
-function isLocal(req) {
-  return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress);
+// Em hospedagem (Render etc.) o proxy do host conecta como endereço local, então o
+// simulador fica desligado lá e em qualquer requisição que chegue por proxy.
+const HOSTED = Boolean(process.env.RENDER || process.env.DISABLE_DEMO === "true");
+function localRequest(address, headers = {}) {
+  if (HOSTED) return false;
+  if (headers["x-forwarded-for"] || headers["x-forwarded-host"] || headers["x-real-ip"] || headers.forwarded) return false;
+  return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address);
 }
+function isLocal(req) { return localRequest(req.socket.remoteAddress, req.headers); }
 app.post("/api/demo", (req, res) => {
   if (!isLocal(req)) return res.status(403).json({ error: "Simulação disponível apenas em localhost." });
   const action = String(req.body?.action || "");
@@ -205,7 +211,7 @@ app.post("/api/demo", (req, res) => {
   res.json({ ok: true });
 });
 io.on("connection", socket => {
-  socket.emit("init", { ...publicState(), demo: ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(socket.handshake.address) });
+  socket.emit("init", { ...publicState(), demo: localRequest(socket.handshake.address, socket.handshake.headers) });
 });
 let previousStep = performance.now();
 let accumulated = 0;
