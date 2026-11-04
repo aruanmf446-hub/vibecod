@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `e427647504b9` |
+| Impressão digital do código | `861880f207f5` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -102,3 +102,16 @@ No Render (variável `RENDER`, definida pelo próprio Render) ou em qualquer req
 - O WebSocket pelo IP foi bloqueado pela rede do ambiente de nuvem, mas o servidor aceita a conexão (resposta 101 testada direto) e o Socket.IO continuou funcionando por polling.
 
 **Não testado:** iPhone físico, app PRISM, widget Web do PRISM, RTMP, live real do TikTok, presentes reais e o computador Windows onde o jogo roda.
+
+
+## Prévia visual — branch `visual-polish` (sem publicação)
+
+Esta proposta parte de `claude/torres-production-validation-969pba`, informado como origem do Render em https://batalha-torres.onrender.com. As instruções anteriores sobre hospedagem local são um registro histórico. Não atualizar o branch de produção durante a live: revisar e integrar o PR em uma janela combinada.
+
+Mudanças somente de apresentação: margem à direita para os controles do TikTok, cabeçalho compacto, HP e pontos maiores, rankings compactos, aviso de presente com nome/presente/reforços, faíscas e números derivados do HP recebido, tremor curto da torre, confete por time e contagem visual de reinício. Os 14 assets, torres, coordenadas do combate e servidor permanecem intactos. O contador é uma estimativa visual dos 10 segundos existentes; entrar no meio da comemoração pode mostrar um tempo diferente do restante real. O servidor continua decidindo o reinício.
+
+Canvas com densidade limitada a 2, cenário estático em cache, partículas reaproveitadas com teto de 120 e números de dano com teto de 24. Movimento reduzido desliga partículas, tremores e giros de derrota. Não há dependências, fontes ou assets remotos novos.
+
+QA: `npm run check`, 21 testes e script existente `scripts/verify-characters.cjs`. Capturas novas em `visual-390x844.png`, `visual-720x1280.png`, `visual-1080x1920.png` e `visual-ip.png`; comparar com `duels-mobile.png`, `duels-arena.png` e `prism-iphone-ip.png`, mantidos sem alteração. Nas três resoluções, o limite inferior da arena ficou em 472/813/1093 px, abaixo dos limites seguros estimados de 591/896/1344 px. A margem é uma aproximação: a sobreposição do TikTok varia com aparelho e modo de captura.
+
+Não testados: iPhone físico, 60 fps em hardware móvel, PRISM, RTMP e live real. Sem deploy ou merge automático. A impressão digital da tabela acima corresponde à proposta visual, não à versão atualmente transmitida.

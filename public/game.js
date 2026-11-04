@@ -9,9 +9,29 @@
   let sprites = new Map(), fallen = [], particles = [], rings = [];
   let sceneId = null, lastFrame = performance.now();
   let tick = 0;
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)") || { matches: false };
+  const particlePool = [];
+  const damageLabels = [];
+  const towerHit = { yellow: 0, blue: 0 };
+  let giftUntil = 0, victoryAt = 0, confettiAt = 0;
+  function resizeCanvas() {
+    const ratio = Math.min(2, window.devicePixelRatio || 1);
+    if (!canvas.getBoundingClientRect) return;
+    const bounds = canvas.getBoundingClientRect();
+    canvas.width = Math.round(bounds.width * ratio);
+    canvas.height = Math.round(bounds.height * ratio);
+    ctx.setTransform(canvas.width / W, 0, 0, canvas.height / H, 0, 0);
+  }
+  window.addEventListener?.("resize", resizeCanvas);
+  resizeCanvas();
   const colors = { yellow: ["#ffb323", "#ffe084", "#c57322"], blue: ["#256cdb", "#90ddff", "#154a9f"] };
   function number(value) { return Math.round(Number(value) || 0).toLocaleString("pt-BR"); }
   function update(stateArg) {
+    if (state && state.battleId === stateArg.battleId) {
+      for (const team of ["yellow", "blue"]) if (stateArg.hp[team] < state.hp[team]) towerHit[team] = performance.now();
+    }
+    if (stateArg.winner && !state?.winner) victoryAt = performance.now();
+    if (!stateArg.winner) victoryAt = 0;
     state = stateArg;
     syncCombat(stateArg);
     $("yellowHpText").textContent = number(state.hp.yellow);
@@ -34,6 +54,7 @@
     $("viewerCount").textContent = state.viewers ? "👥 " + number(state.viewers) : "⚡ BATALHA INTERATIVA";
     const powered = Date.now() < state.powerUntil;
     app.classList.toggle("power-active", powered);
+    app.classList.toggle("energy-near", state.energy >= 80);
     $("powerStatus").textContent = state.winner ? "BATALHA ENCERRADA" : powered ? "⚡ PODER ATIVADO" : "⚔️ DUELOS AUTOMÁTICOS";
     for (const team of ["yellow", "blue"]) {
       const list = $(team + "Rank");
@@ -59,6 +80,15 @@
   });
   socket.on("state", update);
   socket.on("attack", data => {
+    if (data.kind === "gift") {
+      const notice = $("giftNotice");
+      notice.replaceChildren();
+      const title = document.createElement("strong"); title.textContent = data.name;
+      const detail = document.createElement("small"); detail.textContent = data.gift + " · +" + data.count + " combatentes";
+      notice.append(title, detail); notice.classList.toggle("blue", data.team === "blue");
+      notice.hidden = false; giftUntil = performance.now() + 3200;
+    }
+    if (reducedMotion.matches) return;
     rings.push({ x: data.team === "yellow" ? 151 : 389, y: 398, life: 35,
       color: data.team === "yellow" ? "#fbd871" : "#7fd7ff" });
     if (rings.length > 20) rings.shift();
@@ -66,7 +96,7 @@
   socket.on("likes", () => { for (let i = 0; i < 8; i++) spark(270, 220, "#c7d5ff"); });
   socket.on("power", () => { for (let i = 0; i < 35; i++) spark(270, 330, "#ffed94"); });
   socket.on("win", () => { for (let i = 0; i < 90; i++) spark(Math.random() * W, Math.random() * 200 + 50, i % 2 ? "#f9c952" : "#7fbaff"); });
-  socket.on("reset", () => { sprites.clear(); fallen = []; particles = []; rings = []; sceneId = null; });
+  socket.on("reset", () => { sprites.clear(); fallen = []; particlePool.push(...particles); particles = []; rings = []; damageLabels.length = 0; sceneId = null; $("giftNotice").hidden = true; });
   document.querySelectorAll("[data-action]").forEach(button => {
     button.addEventListener("click", async () => {
       button.disabled = true;
@@ -87,6 +117,10 @@
       present.add(unit.id);
       const appearance = characters.teams[unit.team][unit.appearance % characters.teams[unit.team].length];
       const previous = sprites.get(unit.id);
+      if (previous && unit.hp < previous.hp && !reducedMotion.matches) {
+        if (damageLabels.length < 24) damageLabels.push({ x: unit.x, y: unit.y - 58, value: previous.hp - unit.hp, until: now + 650 });
+        for (let k = 0; k < 2; k++) spark(unit.x, unit.y - 20, appearance.accent);
+      }
       sprites.set(unit.id, { ...unit, appearance, idle: false, phase: unit.id * 1.37,
         x: previous ? previous.x : unit.x, targetX: unit.x,
         receivedAt: now, serverTime: data.combat.time });
@@ -99,9 +133,12 @@
     if (fallen.length > 24) fallen.splice(0, fallen.length - 24);
   }
   function spark(x, y, color) {
-    particles.push({ x, y, vx: rnd(-4, 4), vy: rnd(-6, 0), life: rnd(19, 50), max: 50, color });
-    if (particles.length > 200) particles.shift();
+    if (reducedMotion.matches || particles.length >= 120) return;
+    const p = particlePool.pop() || {};
+    Object.assign(p, { x, y, vx: rnd(-3, 3), vy: rnd(-5, 0), life: rnd(19, 50), max: 50, color });
+    particles.push(p);
   }
+
   function star(x, y, size, color) {
     ctx.fillStyle = color;
     ctx.beginPath(); ctx.moveTo(x, y - size); ctx.lineTo(x + size * .25, y - size * .25);
@@ -115,10 +152,11 @@
     ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
   }
   function sky() {
+    if (sky.cache) { ctx.drawImage(sky.cache, 0, 0, W, H); return; }
     const grad = ctx.createLinearGradient(0, 0, 0, H);
     grad.addColorStop(0, "#121d39"); grad.addColorStop(.55, "#213b6b"); grad.addColorStop(1, "#111a34");
     ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
-    const sun = ctx.createRadialGradient(270, 235, 3, 270, 235, 240);
+    const sun = ctx.createRadialGradient(270, 310, 3, 270, 310, 300);
     sun.addColorStop(0, "#c4d1fa26"); sun.addColorStop(1, "#617cc400");
     ctx.fillStyle = sun; ctx.fillRect(0, 0, W, 520);
     for (let i = 0; i < 42; i++) {
@@ -127,7 +165,10 @@
       star(x, y, 1.8, "#daeaff");
     }
     ctx.globalAlpha = 1;
-    hill("#172b4f", 370, 0.4); hill("#132444", 403, 1.2);
+    hill("#1d3657", 370, 0.4); hill("#162f46", 403, 1.2);
+    const light = ctx.createLinearGradient(0, 310, W, 480);
+    light.addColorStop(0, "#ffd56b16"); light.addColorStop(.5, "#74c8df08"); light.addColorStop(1, "#6dbfff20");
+    ctx.fillStyle = light; ctx.fillRect(0, 300, W, 180);
     ctx.fillStyle = "#172541"; ctx.fillRect(0, 471, W, 179);
     ctx.fillStyle = "#263b5b"; ctx.fillRect(0, 470, W, 5);
     for (let i = 0; i < 35; i++) {
@@ -140,11 +181,16 @@
     for (let y = 492; y < H; y += (y - 457) * .19) {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
     }
+    sky.cache = document.createElement("canvas");
+    sky.cache.width = W; sky.cache.height = H;
+    sky.cache.getContext("2d").drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, W, H);
   }
   function tower(team) {
     const left = team === "yellow"; const x = left ? 56 : 416;
     const pal = colors[team], hp = state ? state.hp[team] / state.maxHp : 1;
     ctx.save();
+    const hitAge = performance.now() - towerHit[team];
+    if (towerHit[team] && hitAge < 220 && !reducedMotion.matches) ctx.translate(Math.sin(hitAge * .1) * 2, 0);
     ctx.shadowColor = pal[0]; ctx.shadowBlur = 28;
     ctx.fillStyle = pal[2]; ctx.fillRect(x + 8, 274, 59, 195);
     ctx.shadowBlur = 0;
@@ -184,25 +230,48 @@
   function frame(now) {
     requestAnimationFrame(frame); tick++;
     const delta = Math.min(100, Math.max(0, now - lastFrame)); lastFrame = now;
+    if (reducedMotion.matches) { tick = 0; particlePool.push(...particles); particles.length = 0; rings.length = 0; damageLabels.length = 0; }
+    $("giftNotice").hidden = now > giftUntil;
+    const countdown = $("victoryCountdown");
+    countdown.hidden = !state?.winner;
+    if (state?.winner) {
+      countdown.textContent = state.autoRestart ? "Próxima batalha em " + Math.max(0, 10 - Math.floor((now - victoryAt) / 1000)) + "s" : "Aguardando reinício";
+      if (now - confettiAt > 180 && now - victoryAt < 10000) {
+        confettiAt = now;
+        for (let i = 0; i < 5; i++) spark(rnd(20, W - 20), rnd(80, 220), state.winner === "yellow" ? "#ffe084" : state.winner === "blue" ? "#90ddff" : i % 2 ? "#ffe084" : "#90ddff");
+      }
+    }
     sky();
     // Raio central decorativo, separação de campo.
     ctx.save(); ctx.strokeStyle = "#bdd4ff25"; ctx.setLineDash([8, 15]); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(270, 145); ctx.lineTo(270, 470); ctx.stroke(); ctx.restore();
     tower("yellow"); tower("blue");
-    for (const sprite of [...sprites.values()].sort((a, b) => a.y - b.y)) hero(sprite, now, delta);
-    fallen = fallen.filter(sprite => now - sprite.deathAt < 600);
+    for (const sprite of sprites.values()) hero(sprite, now, delta);
+    for (let i = fallen.length - 1; i >= 0; i--) if (now - fallen[i].deathAt >= 600) fallen.splice(i, 1);
     for (const sprite of fallen) hero(sprite, now, delta);
     for (const ring of rings) {
       ring.life--;
       ctx.strokeStyle = ring.color; ctx.globalAlpha = ring.life / 35;
       ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(ring.x, ring.y, 55 - ring.life, 0, Math.PI * 2); ctx.stroke();
     }
-    ctx.globalAlpha = 1; rings = rings.filter(r => r.life > 0);
+    ctx.globalAlpha = 1;
+    for (let i = rings.length - 1; i >= 0; i--) if (rings[i].life <= 0) rings.splice(i, 1);
     for (const p of particles) {
       p.x += p.vx; p.y += p.vy; p.vy += .15; p.life--;
       ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 4, 4);
     }
-    ctx.globalAlpha = 1; particles = particles.filter(p => p.life > 0);
+    ctx.globalAlpha = 1;
+    for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particlePool.push(...particles.splice(i, 1));
+    ctx.font = "bold 13px system-ui"; ctx.textAlign = "center";
+    for (let i = damageLabels.length - 1; i >= 0; i--) {
+      const label = damageLabels[i], remaining = label.until - now;
+      if (remaining <= 0 || reducedMotion.matches) { damageLabels.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, remaining / 200);
+      ctx.strokeStyle = "#061226"; ctx.lineWidth = 3; ctx.fillStyle = "#fff4d2";
+      const y = label.y - (650 - remaining) * .02;
+      ctx.strokeText("−" + label.value, label.x, y); ctx.fillText("−" + label.value, label.x, y);
+    }
+    ctx.globalAlpha = 1;
   }
   requestAnimationFrame(frame);
 })();
