@@ -1,0 +1,17 @@
+{
+  "results": [
+    "Doações invocam 1 ou 19 combatentes, sem dano instantâneo; pontos, ranking e energia mantidos",
+    "Dois espectadores recebem a mesma simulação; duelos causam dano individual e param o avanço",
+    "360x640: sem overflow horizontal; limite de 12 ativos por time",
+    "390x844: sem overflow horizontal; limite de 12 ativos por time",
+    "720x1280: sem overflow horizontal; limite de 12 ativos por time",
+    "768x1024: sem overflow horizontal; limite de 12 ativos por time",
+    "1440x900: sem overflow horizontal; limite de 12 ativos por time",
+    "Recarregar o navegador recupera os combatentes existentes",
+    "Combatentes sem adversário alcançam e danificam a torre",
+    "Vitória real por destruição da torre; reinício automático em 10s, preservando presente enviado durante a comemoração",
+    "Sem erros de console, exceções ou falhas de carregamento; movimento reduzido sem exceções"
+  ],
+  "errors": [],
+  "failed": []
+}

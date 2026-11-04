@@ -1,4 +1,4 @@
-/* Visual-only roster. Coordinates, lifetimes and combat remain in game.js. */
+/* Shared visual roster. Authoritative combat is supplied by the server. */
 (() => {
   "use strict";
   const entries = [
@@ -84,9 +84,9 @@
     const character = sprite.appearance, image = images.get(character.id);
     if (!image) return;
     const time = reducedMotion.matches ? 0 : tick * .12 + sprite.phase;
-    // "Attack" is only the final part of the existing visual advance, never a new hit.
-    const attacking = !sprite.idle && (sprite.team === "yellow" ? sprite.x > 375 : sprite.x < 166);
-    const defeated = winner && winner !== sprite.team;
+    const attacking = sprite.action === "attack" && sprite.attackUntil > sprite.combatTime;
+    const hurt = sprite.hurtUntil > sprite.combatTime;
+    const defeated = sprite.defeated || (winner && winner !== sprite.team);
     const scalePulse = !reducedMotion.matches && character.effects[0] === "scale" ? 1 + Math.sin(time * .7) * .045 : 1;
     const bob = reducedMotion.matches ? 0 : Math.sin(time) * (sprite.idle ? .65 : 1.5);
     ctx.save();
@@ -100,13 +100,21 @@
     ctx.beginPath(); ctx.ellipse(0, 1, 12 * character.scale, 3, 0, 0, Math.PI * 2); ctx.fill();
     ctx.translate(0, bob);
     if (sprite.team === "blue") ctx.scale(-1, 1);
-    if (defeated) { ctx.globalAlpha = .45; ctx.rotate(.18); }
+    if (defeated) { ctx.globalAlpha = .45 * (1 - (sprite.deathProgress || 0)); ctx.rotate(.18 + (sprite.deathProgress || 0) * .6); }
+    else if (hurt) { ctx.globalAlpha = .6; ctx.translate(-2, 0); }
     else if (!reducedMotion.matches) ctx.rotate(attacking ? Math.sin(time * 2) * .09 : Math.sin(time) * (sprite.idle ? .012 : .035));
     ctx.scale(character.scale * scalePulse, character.scale * scalePulse);
     // Feet are anchored at y=0. Oversized units retain their existing logical position.
     ctx.drawImage(image, -28, -54, 56, 63);
     if (!defeated && !reducedMotion.matches) effect(ctx, character, time, attacking);
     ctx.restore();
+    if (!defeated && sprite.maxHp) {
+      ctx.save(); ctx.translate(drawX, drawY - 61 * character.scale);
+      ctx.fillStyle = "#050d20"; ctx.fillRect(-15, -1, 30, 5);
+      ctx.fillStyle = sprite.team === "yellow" ? "#ffe084" : "#90ddff";
+      ctx.fillRect(-14, 0, 28 * Math.max(0, sprite.hp / sprite.maxHp), 3);
+      ctx.restore();
+    }
   }
   window.BattleCharacters = Object.freeze({ definitions, teams, ready, draw });
 })();

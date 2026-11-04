@@ -46,7 +46,7 @@ test('renderização visual não modifica posição, velocidade, time ou duraç�
     assert.equal(calls.filter(c => c[0] === 'save').length, calls.filter(c => c[0] === 'restore').length);
   }
 });
-test('invocações percorrem exclusivamente o catálogo do próprio time e mantêm limites', async () => {
+test('cliente reconcilia combatentes do servidor sem inventar unidades ou dano', async () => {
   const roster = setup(); await roster.ready;
   const ctx = new Proxy({}, { get: () => () => {}, set: () => true });
   const elements = new Proxy({}, { get: (target, id) => target[id] ||= {
@@ -60,24 +60,21 @@ test('invocações percorrem exclusivamente o catálogo do próprio time e mant�
     requestAnimationFrame() {}, setTimeout: fn => fn(), Math, console
   };
   const source = readFileSync(new URL('../public/game.js', import.meta.url), 'utf8');
-  vm.runInNewContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.probe = { spawn, hero, units: () => sprites };})();'), sandbox);
-  for (const team of ['yellow', 'blue']) for (let i = 0; i < 24; i++) sandbox.probe.spawn(team, false);
-  const units = sandbox.probe.units();
-  assert.equal(units.length, 48);
-  for (const team of ['yellow', 'blue']) {
-    const own = units.filter(s => s.team === team);
-    assert.equal(new Set(own.map(s => s.appearance.id)).size, roster.teams[team].length);
-    for (const s of own) {
-      assert.equal(s.appearance.team, team);
-      assert.ok(s.speed >= 1.5 && s.speed <= 2.6);
-      assert.ok(s.ttl >= 220 && s.ttl <= 300);
-      const x = s.x, ttl = s.ttl;
-      sandbox.probe.hero(s);
-      assert.equal(s.x, x + (team === 'yellow' ? s.speed : -s.speed));
-      assert.equal(s.ttl, ttl - 1);
-    }
-  }
-  const s = units[0]; s.x = 413; assert.equal(sandbox.probe.hero(s), false);
-  for (let i = 0; i < 120; i++) sandbox.probe.spawn('yellow', true);
-  assert.equal(sandbox.probe.units().length, 110);
+  vm.runInNewContext(source.replace(/\}\)\(\);\s*$/, 'globalThis.probe = { syncCombat, units: () => sprites, fallen: () => fallen };})();'), sandbox);
+  const fighters = roster.definitions.map((c, id) => ({ id, team: c.team,
+    appearance: roster.teams[c.team].indexOf(c), hp:40,maxHp:40,action:'move',x:180+id,y:330 }));
+  const data = { battleId:'first',combat:{time:0,fighters} };
+  const original = JSON.stringify(data);
+  sandbox.probe.syncCombat(data);
+  assert.equal(sandbox.probe.units().size,14);
+  for (const unit of sandbox.probe.units().values()) assert.equal(unit.appearance.team,unit.team);
+  listeners.attack({team:'yellow',count:50});
+  assert.equal(sandbox.probe.units().size,14);
+  sandbox.probe.syncCombat({battleId:'first',combat:{time:100,fighters:fighters.slice(1)}});
+  assert.equal(sandbox.probe.units().size,13);
+  assert.equal(sandbox.probe.fallen().length,1);
+  sandbox.probe.syncCombat({battleId:'second',combat:{time:0,fighters:[]}});
+  assert.equal(sandbox.probe.units().size,0);
+  assert.equal(sandbox.probe.fallen().length,0);
+  assert.equal(JSON.stringify(data),original);
 });

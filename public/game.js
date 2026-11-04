@@ -5,23 +5,27 @@
   const W = canvas.width, H = canvas.height;
   const socket = io();
   const characters = window.BattleCharacters;
-  const appearanceIndex = { yellow: 0, blue: 0 };
   let state = null;
-  let sprites = [], particles = [], rings = [];
+  let sprites = new Map(), fallen = [], particles = [], rings = [];
+  let sceneId = null, lastFrame = performance.now();
   let tick = 0;
   const colors = { yellow: ["#ffb323", "#ffe084", "#c57322"], blue: ["#256cdb", "#90ddff", "#154a9f"] };
   function number(value) { return Math.round(Number(value) || 0).toLocaleString("pt-BR"); }
   function update(stateArg) {
     state = stateArg;
+    syncCombat(stateArg);
     $("yellowHpText").textContent = number(state.hp.yellow);
     $("blueHpText").textContent = number(state.hp.blue);
     $("yellowHp").style.width = (100 * state.hp.yellow / state.maxHp) + "%";
     $("blueHp").style.width = (100 * state.hp.blue / state.maxHp) + "%";
     $("yellowPoints").textContent = number(state.points.yellow) + " PTS";
     $("bluePoints").textContent = number(state.points.blue) + " PTS";
-    $("roundNo").textContent = "RODADA " + String(state.round).padStart(2, "0");
-    const minutes = Math.floor(state.seconds / 60), seconds = state.seconds % 60;
-    $("clock").textContent = String(minutes).padStart(2, "0") + ":" + String(seconds).padStart(2, "0");
+    const active = state.combat?.active || { yellow: 0, blue: 0 };
+    const queued = state.combat?.queued || { yellow: 0, blue: 0 };
+    $("roundNo").textContent = active.yellow + " × " + active.blue + " EM CAMPO";
+    $("clock").textContent = "SEM LIMITE";
+    $("combatQueue").textContent = "REFORÇOS NA FILA · AMARELO " + queued.yellow + " · AZUL " + queued.blue +
+      (state.nextReinforcements ? " · PRÓXIMA BATALHA +" + state.nextReinforcements : "");
     $("energyFill").style.width = state.energy + "%";
     $("energyText").textContent = Math.floor(state.energy) + "%";
     $("energyFlag").textContent = state.connected ? "🔴 AO VIVO" : "FANMADE";
@@ -30,7 +34,7 @@
     $("viewerCount").textContent = state.viewers ? "👥 " + number(state.viewers) : "⚡ BATALHA INTERATIVA";
     const powered = Date.now() < state.powerUntil;
     app.classList.toggle("power-active", powered);
-    $("powerStatus").textContent = powered ? "⚡ PODER ATIVADO" : "⚔️ BATALHA EM ANDAMENTO";
+    $("powerStatus").textContent = state.winner ? "BATALHA ENCERRADA" : powered ? "⚡ PODER ATIVADO" : "⚔️ DUELOS AUTOMÁTICOS";
     for (const team of ["yellow", "blue"]) {
       const list = $(team + "Rank");
       list.replaceChildren();
@@ -45,27 +49,24 @@
     if (state.news) $("toast").textContent = state.news;
     if (state.winner) {
       $("winBanner").hidden = false;
-      $("winBanner").textContent = "🏆 " + (state.winner === "yellow" ? "VINGADORES" : "X-MEN") + " VENCERAM!";
+      $("winBanner").textContent = state.winner === "draw" ? "⚔️ EMPATE!" : "🏆 " + (state.winner === "yellow" ? "VINGADORES" : "X-MEN") + " VENCERAM!";
       $("winBanner").classList.toggle("blue-winner", state.winner === "blue");
     } else $("winBanner").hidden = true;
   }
   socket.on("init", data => {
     $("demoPanel").hidden = !data.demo;
     update(data);
-    for (let i = 0; i < 7; i++) { spawn("yellow", true); spawn("blue", true); }
   });
   socket.on("state", update);
   socket.on("attack", data => {
-    for (let i = 0; i < Math.min(16, data.count); i++) {
-      setTimeout(() => spawn(data.team, false), i * 80);
-    }
-    rings.push({ x: data.team === "yellow" ? 431 : 109, y: 372, life: 35,
+    rings.push({ x: data.team === "yellow" ? 151 : 389, y: 398, life: 35,
       color: data.team === "yellow" ? "#fbd871" : "#7fd7ff" });
+    if (rings.length > 20) rings.shift();
   });
   socket.on("likes", () => { for (let i = 0; i < 8; i++) spark(270, 220, "#c7d5ff"); });
   socket.on("power", () => { for (let i = 0; i < 35; i++) spark(270, 330, "#ffed94"); });
   socket.on("win", () => { for (let i = 0; i < 90; i++) spark(Math.random() * W, Math.random() * 200 + 50, i % 2 ? "#f9c952" : "#7fbaff"); });
-  socket.on("reset", () => { sprites = []; particles = []; rings = []; for (let i = 0; i < 6; i++) { spawn("yellow", true); spawn("blue", true); } });
+  socket.on("reset", () => { sprites.clear(); fallen = []; particles = []; rings = []; sceneId = null; });
   document.querySelectorAll("[data-action]").forEach(button => {
     button.addEventListener("click", async () => {
       button.disabled = true;
@@ -78,15 +79,24 @@
     });
   });
   function rnd(min, max) { return min + Math.random() * (max - min); }
-  function spawn(team, idle) {
-    const roster = characters.teams[team];
-    const visualSlot = appearanceIndex[team]++;
-    const appearance = roster[visualSlot % roster.length];
-    sprites.push({ team, appearance, visualSlot,
-      x: team === "yellow" ? rnd(64, 135) : rnd(405, 475),
-      y: rnd(425, 478), start: performance.now(), idle, phase: rnd(0, Math.PI * 2),
-      speed: rnd(1.5, 2.6), ttl: idle ? 999999 : 220 + rnd(0, 80) });
-    if (sprites.length > 110) sprites.splice(0, sprites.length - 110);
+  function syncCombat(data) {
+    const now = performance.now();
+    if (sceneId !== data.battleId) { sprites.clear(); fallen = []; sceneId = data.battleId; }
+    const present = new Set();
+    for (const unit of data.combat?.fighters || []) {
+      present.add(unit.id);
+      const appearance = characters.teams[unit.team][unit.appearance % characters.teams[unit.team].length];
+      const previous = sprites.get(unit.id);
+      sprites.set(unit.id, { ...unit, appearance, idle: false, phase: unit.id * 1.37,
+        x: previous ? previous.x : unit.x, targetX: unit.x,
+        receivedAt: now, serverTime: data.combat.time });
+    }
+    for (const [id, unit] of sprites) if (!present.has(id)) {
+      fallen.push({ ...unit, defeated: true, deathAt: now });
+      for (let k = 0; k < 3; k++) spark(unit.x, unit.y - 20, unit.appearance.accent);
+      sprites.delete(id);
+    }
+    if (fallen.length > 24) fallen.splice(0, fallen.length - 24);
   }
   function spark(x, y, color) {
     particles.push({ x, y, vx: rnd(-4, 4), vy: rnd(-6, 0), life: rnd(19, 50), max: 50, color });
@@ -164,28 +174,24 @@
     }
     ctx.restore();
   }
-  function hero(sprite) {
-    const left = sprite.team === "yellow", p = colors[sprite.team];
-    if (!sprite.idle) {
-      sprite.x += left ? sprite.speed : -sprite.speed;
-      sprite.ttl--;
-      if (sprite.ttl <= 0 || (left ? sprite.x > 412 : sprite.x < 129)) {
-        for (let k = 0; k < 4; k++) spark(sprite.x, sprite.y - 15, p[1]);
-        return false;
-      }
-    }
+  function hero(sprite, now, delta) {
+    sprite.x += (sprite.targetX - sprite.x) * (1 - Math.exp(-delta / 55));
+    sprite.combatTime = sprite.serverTime + Math.min(100, now - sprite.receivedAt);
+    if (sprite.deathAt !== undefined) sprite.deathProgress = Math.min(1, (now - sprite.deathAt) / 600);
     characters.draw(ctx, sprite, tick, state?.winner);
-    return true;
   }
 
-  function frame() {
+  function frame(now) {
     requestAnimationFrame(frame); tick++;
+    const delta = Math.min(100, Math.max(0, now - lastFrame)); lastFrame = now;
     sky();
     // Raio central decorativo, separação de campo.
     ctx.save(); ctx.strokeStyle = "#bdd4ff25"; ctx.setLineDash([8, 15]); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(270, 145); ctx.lineTo(270, 470); ctx.stroke(); ctx.restore();
     tower("yellow"); tower("blue");
-    sprites = sprites.filter(hero);
+    for (const sprite of [...sprites.values()].sort((a, b) => a.y - b.y)) hero(sprite, now, delta);
+    fallen = fallen.filter(sprite => now - sprite.deathAt < 600);
+    for (const sprite of fallen) hero(sprite, now, delta);
     for (const ring of rings) {
       ring.life--;
       ctx.strokeStyle = ring.color; ctx.globalAlpha = ring.life / 35;

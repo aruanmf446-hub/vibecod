@@ -1,107 +1,93 @@
-/* Run against npm start. No runtime dependency is added to the game.
-   PLAYWRIGHT_MODULE=/path/to/playwright node scripts/verify-characters.cjs */
+/* npm start, then PLAYWRIGHT_MODULE=/path/to/playwright node scripts/verify-characters.cjs.
+   Chromium is a QA tool only; no new game runtime dependency. */
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
+const base = process.env.GAME_URL || 'http://127.0.0.1:3000';
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  const context = await browser.newContext({viewport:{width:390,height:844}});
   const errors = [], failed = [], results = [];
-  page.on('pageerror', error => errors.push(error.message));
-  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
-  page.on('requestfailed', request => failed.push(request.url()));
-  await page.addInitScript(() => {
+  await context.addInitScript(() => {
     let factory;
     Object.defineProperty(window, 'io', { configurable: true, get: () => factory, set: original => {
       factory = (...args) => {
         const socket = original(...args), on = socket.on.bind(socket);
-        window.qaEvents = {};
-        socket.on = (name, fn) => { window.qaEvents[name] = fn; return on(name, fn); };
+        window.qaSnapshots = {};
+        socket.on = (name, fn) => on(name, data => {
+          if(name==='state'||name==='init') {
+            window.qaState=data;
+            window.qaSnapshots[data.combat.time]=JSON.stringify(data.combat);
+            const times=Object.keys(window.qaSnapshots);if(times.length>40)delete window.qaSnapshots[times[0]];
+          }
+          return fn(data);
+        });
         return socket;
       };
     } });
   });
-  for (const [name, width, height] of [['mobile',390,844],['desktop',1440,900]]) {
-    await page.setViewportSize({width,height});
-    // Real browser rendering of the inspected base commit, at the same viewport.
-    const original = execFileSync('git', ['show','38e91b0:public/game.js'], {cwd:root,encoding:'utf8'});
-    await page.route('**/game.js', route => route.fulfill({body:original,contentType:'application/javascript'}));
-    await page.goto('http://127.0.0.1:3000');
-    await page.waitForFunction(() => document.querySelector('#clock').textContent !== '03:00');
-    await page.screenshot({path:path.join(root,`docs/before-${name}.png`),fullPage:true});
-    await page.unroute('**/game.js');
-    await page.reload(); await page.evaluate(() => BattleCharacters.ready);
-    await page.waitForTimeout(150);
-    await page.screenshot({path:path.join(root,`docs/after-${name}.png`),fullPage:true});
-  }
-  await page.setViewportSize({width:390,height:844});
-  const click = async action => {
-    const response = page.waitForResponse(r => r.url().endsWith('/api/demo') && r.request().method() === 'POST');
-    await page.locator(`[data-action="${action}"]`).click();
-    assert.equal((await response).status(),200);
+  context.on('page', page => {
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+    page.on('requestfailed', request => failed.push(request.url()));
+  });
+  const page=await context.newPage();
+  await page.goto(base);await page.waitForFunction(()=>window.qaState?.combat);await page.evaluate(()=>BattleCharacters.ready);
+  const click=async action=>{
+    const response=page.waitForResponse(r=>r.url().endsWith('/api/demo')&&r.request().method()==='POST');
+    await page.locator(`[data-action="${action}"]`).click();assert.equal((await response).status(),200);
     await page.waitForTimeout(100);
   };
   await click('reset');
-  await click('flower'); assert.equal(await page.locator('#blueHpText').textContent(),'1.192');
-  await click('rose'); assert.equal(await page.locator('#yellowHpText').textContent(),'1.192');
-  await click('megaYellow'); assert.equal(await page.locator('#blueHpText').textContent(),'1.042');
-  await click('megaBlue'); assert.equal(await page.locator('#yellowHpText').textContent(),'1.042');
-  await click('likes'); assert.equal(await page.locator('#energyText').textContent(),'30%');
-  for (const team of ['yellow', 'blue']) {
-    const rows = await page.locator(`#${team}Rank li`).allTextContents();
-    assert.deepEqual(rows.map(row => Number(row.split('•')[1].trim())), [150, 8]);
-  }
-  results.push('6 controles locais: Flor, Rosa, +150 de ambos os times, likes e reinício; HP, pontos, energia e ranking corretos');
-  await page.waitForTimeout(650);
-  await page.locator('#battle').screenshot({path:path.join(root,'docs/after-battle.png')});
-  for (const [width,height] of [[360,640],[390,844],[720,1280],[768,1024],[1440,900]]) {
+  assert.equal(await page.locator('#clock').textContent(),'SEM LIMITE');
+  assert.equal(await page.evaluate(()=>qaState.combat.fighters.length),0);
+  assert.equal(await page.evaluate(()=>'round' in qaState),false);
+  await click('flower');assert.equal(await page.locator('#blueHpText').textContent(),'1.200');
+  assert.equal(await page.evaluate(()=>qaState.units.yellow),1);
+  await click('rose');assert.equal(await page.evaluate(()=>qaState.units.blue),1);
+  await click('megaYellow');await click('megaBlue');await click('likes');
+  assert.equal(await page.locator('#energyText').textContent(),'30%');
+  assert.equal(await page.locator('#yellowPoints').textContent(),'158 PTS');
+  assert.equal(await page.locator('#bluePoints').textContent(),'158 PTS');
+  assert.ok(await page.evaluate(()=>qaState.combat.queued.yellow>0&&qaState.combat.queued.blue>0));
+  results.push('Doações invocam 1 ou 19 combatentes, sem dano instantâneo; pontos, ranking e energia mantidos');
+  const second=await context.newPage();await second.goto(base);await second.waitForFunction(()=>window.qaState?.combat);
+  await page.waitForFunction(()=>qaState.combat.fighters.some(u=>u.hp<40&&u.action==='attack'),{},{timeout:15000});
+  const a=await page.evaluate(()=>qaSnapshots),b=await second.evaluate(()=>qaSnapshots);
+  const common=Object.keys(a).filter(t=>b[t]);assert.ok(common.length>0);
+  for(const time of common)assert.equal(a[time],b[time]);
+  results.push('Dois espectadores recebem a mesma simulação; duelos causam dano individual e param o avanço');
+  await page.screenshot({path:path.join(root,'docs/duels-mobile.png'),fullPage:true});
+  await page.locator('#battle').screenshot({path:path.join(root,'docs/duels-arena.png')});
+  for(const [width,height] of [[360,640],[390,844],[720,1280],[768,1024],[1440,900]]) {
     await page.setViewportSize({width,height});
-    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),false);
-    const box = await page.locator('#battle').boundingBox();
-    assert.ok(box.width > 0 && box.height > 0);
-    const first = await page.locator('#battle').screenshot();
-    await page.waitForTimeout(100);
-    const second = await page.locator('#battle').screenshot();
-    assert.equal(first.equals(second),false);
-    results.push(`${width}x${height}: sem overflow horizontal; Canvas animado`);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.ok(await page.evaluate(()=>qaState.combat.active.yellow<=12&&qaState.combat.active.blue<=12));
+    results.push(`${width}x${height}: sem overflow horizontal; limite de 12 ativos por time`);
   }
-  for (let i=0;i<7;i++) await click('megaYellow');
-  await page.locator('#winBanner').waitFor({state:'visible'});
+  await page.screenshot({path:path.join(root,'docs/duels-desktop.png'),fullPage:true});
+  await page.reload();await page.waitForFunction(()=>window.qaState?.combat);
+  assert.ok(await page.evaluate(()=>qaState.combat.fighters.length>0));
+  results.push('Recarregar o navegador recupera os combatentes existentes');
+  await click('reset');await click('megaYellow');
+  await page.waitForFunction(()=>qaState.hp.blue<1200,{},{timeout:15000});
+  results.push('Combatentes sem adversário alcançam e danificam a torre');
+  console.log('Duelos, sincronização e torre verificados; aguardando vitória real e reinício automático...');
+  await page.locator('#winBanner').waitFor({state:'visible',timeout:60000});
+  assert.equal(await page.evaluate(()=>qaState.winner),'yellow');
   assert.equal(await page.locator('#blueHpText').textContent(),'0');
-  await click('reset');
+  const finishedId=await page.evaluate(()=>qaState.battleId);
+  await click('rose');assert.equal(await page.evaluate(()=>qaState.nextReinforcements),1);
+  await page.waitForFunction(id=>qaState.battleId!==id,finishedId,{timeout:15000});
+  assert.equal(await page.evaluate(()=>qaState.units.blue),1);
   assert.equal(await page.locator('#yellowHpText').textContent(),'1.200');
-  assert.equal(await page.locator('#blueHpText').textContent(),'1.200');
-  assert.equal(await page.locator('#energyText').textContent(),'0%');
-  assert.equal(await page.locator('#winBanner').isVisible(),false);
-  results.push('Vitória pelo HP e reinício manual verificados sem conexão com a live');
-  // Visual gallery: never changes the number of units in a real match.
-  await page.setViewportSize({width:1120,height:660});
-  await page.evaluate(() => {
-    document.body.replaceChildren();
-    document.body.style.cssText='margin:0;background:#101e34;color:#e2ecff;font:12px system-ui;display:grid;grid-template-columns:repeat(7,160px);justify-content:center';
-    for (const c of BattleCharacters.definitions) {
-      const card=document.createElement('div'); card.style.cssText='text-align:center;padding:14px 0';
-      const image=document.createElement('img'); image.src=c.asset; image.width=160; image.height=180;
-      const label=document.createElement('p'); label.textContent=c.name;
-      const team=document.createElement('small'); team.textContent=c.team==='yellow'?'TIME FLOR · AMARELO':'TIME ROSA · AZUL'; team.style.color=c.team==='yellow'?'#ffe28a':'#8bc8ff';
-      card.append(image,label,team); document.body.append(card);
-    }
-  });
-  await page.waitForFunction(() => [...document.images].every(img=>img.complete&&img.naturalWidth>0));
-  await page.screenshot({path:path.join(root,'docs/characters-preview.png')});
-  await page.goto('http://127.0.0.1:3000'); await page.evaluate(() => BattleCharacters.ready);
-  await page.evaluate(() => { for(let i=0;i<8;i++) { qaEvents.attack({team:'yellow',count:16});qaEvents.attack({team:'blue',count:16}); } });
-  await page.waitForTimeout(1500);
-  const intervals=await page.evaluate(() => new Promise(resolve => {const d=[];let prev=performance.now();function sample(t){d.push(t-prev);prev=t;if(d.length<90)requestAnimationFrame(sample);else resolve(d.slice(1));}requestAnimationFrame(sample);}));
-  results.push(`Carga visual até limite existente de 110 unidades: média de ${(intervals.reduce((a,b)=>a+b)/intervals.length).toFixed(1)} ms/frame no Chromium deste ambiente`);
-  await page.emulateMedia({reducedMotion:'reduce'}); await page.waitForTimeout(100);
-  results.push('prefers-reduced-motion: renderização sem exceções');
-  assert.deepEqual(errors,[]); assert.deepEqual(failed,[]);
-  results.push('Nenhum erro de console, exceção ou request malsucedido observado');
-  fs.writeFileSync(path.join(root,'docs/browser-results.json'),JSON.stringify({results,errors,failed},null,2)+'\n');
+  results.push('Vitória real por destruição da torre; reinício automático em 10s, preservando presente enviado durante a comemoração');
+  await page.emulateMedia({reducedMotion:'reduce'});await page.waitForTimeout(100);
+  assert.deepEqual(errors,[]);assert.deepEqual(failed,[]);
+  results.push('Sem erros de console, exceções ou falhas de carregamento; movimento reduzido sem exceções');
+  fs.writeFileSync(path.join(root,'docs/duels-browser-results.json'),JSON.stringify({results,errors,failed},null,2)+'\n');
   console.log(results.join('\n'));
   await browser.close();
 })().catch(error=>{console.error(error);process.exit(1)});

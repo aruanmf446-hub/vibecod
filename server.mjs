@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { randomUUID } from "node:crypto";
+import { Battle, COMBAT, reinforcementCount } from "./battle.mjs";
 import express from "express";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -13,28 +15,33 @@ const httpServer = createServer(app);
 const io = new Server(httpServer);
 const root = path.dirname(fileURLToPath(import.meta.url));
 const LIMIT = 1200;
-const ROUND_SECONDS = 180;
+const AUTO_RESTART = process.env.AUTO_RESTART !== "false";
 const teamOf = new Map();
 const chatCooldown = new Map();
 const scores = { yellow: new Map(), blue: new Map() };
 let currentConnection = null;
 let retryTimer = null;
 let lastTotalLikes = null;
-let match = freshMatch(1);
+let battle = new Battle();
+let restartTimer = null;
+let pendingReinforcements = [];
+let match = freshMatch();
 let lastNews = "A batalha vai começar!";
 
-function freshMatch(round) {
+function freshMatch() {
   return {
-    round, hp: { yellow: LIMIT, blue: LIMIT }, maxHp: LIMIT,
+    battleId: randomUUID(), hp: { yellow: LIMIT, blue: LIMIT }, maxHp: LIMIT,
     points: { yellow: 0, blue: 0 }, units: { yellow: 0, blue: 0 },
-    seconds: ROUND_SECONDS, winner: null, status: "playing",
+    winner: null, status: "playing",
     energy: 0, powerUntil: 0, viewers: 0, connected: false,
     lastGift: "", lastUser: ""
   };
 }
 function publicState() {
   return {
-    ...match, news: lastNews, configured: Boolean(USERNAME),
+    ...match, combat: battle.snapshot(), autoRestart: AUTO_RESTART,
+    nextReinforcements: pendingReinforcements.reduce((total, r) => total + reinforcementCount(r.value, r.kind), 0),
+    news: lastNews, configured: Boolean(USERNAME),
     leaderboard: Object.fromEntries(["yellow", "blue"].map(team => [
       team, [...scores[team].values()].sort((a, b) => b.points - a.points).slice(0, 3)
     ]))
@@ -82,30 +89,41 @@ function addPoints(team, person, amount) {
   previous.name = person.name;
   table.set(person.id, previous);
 }
+function resetBattle() {
+  clearTimeout(restartTimer); restartTimer = null;
+  const live = { connected: match.connected, viewers: match.viewers };
+  const pending = pendingReinforcements; pendingReinforcements = [];
+  scores.yellow.clear(); scores.blue.clear();
+  battle = new Battle();
+  match = { ...freshMatch(), ...live };
+  lastNews = "Nova batalha! Envie Flor ou Rosa para invocar combatentes.";
+  io.emit("reset", { battleId: match.battleId });
+  for (const r of pending) strike(r.team, r.person, r.value, r.kind, r.gift);
+  publish();
+}
 function endRound(winner) {
   if (match.status !== "playing") return;
   match.status = "finished";
   match.winner = winner;
-  lastNews = "VITÓRIA: " + (winner === "yellow" ? "VINGADORES" : "X-MEN") + "!";
-  io.emit("win", { winner, round: match.round });
+  lastNews = winner === "draw" ? "EMPATE! As duas torres caíram juntas." :
+    "VITÓRIA: " + (winner === "yellow" ? "VINGADORES" : "X-MEN") + "!";
+  lastNews += AUTO_RESTART ? " Nova batalha em 10 segundos." : " Aguardando reinício.";
+  io.emit("win", { winner, battleId: match.battleId });
   publish();
-  setTimeout(() => {
-    const next = match.round + 1;
-    scores.yellow.clear(); scores.blue.clear();
-    match = freshMatch(next);
-    lastNews = "Nova rodada! Escolha um lado e envie presentes.";
-    io.emit("reset", { round: next });
-    publish();
-  }, 10000);
+  if (AUTO_RESTART) restartTimer = setTimeout(resetBattle, 10000);
 }
 function strike(team, person, value, kind, gift = "") {
-  if (match.status !== "playing") return;
-  const opponent = team === "yellow" ? "blue" : "yellow";
+  if (match.status !== "playing") {
+    pendingReinforcements.push({ team, person, value, kind, gift });
+    lastNews = person.name + " enviou reforços para a próxima batalha!";
+    publish();
+    return;
+  }
   const powered = Date.now() < match.powerUntil;
   const points = Math.max(1, Math.round(value * (powered ? 1.5 : 1)));
-  match.hp[opponent] = Math.max(0, match.hp[opponent] - points);
   match.points[team] += points;
-  const count = kind === "gift" ? Math.min(14, Math.max(1, 1 + Math.floor(Math.log2(value + 1)))) : 1;
+  const count = reinforcementCount(value, kind);
+  battle.summon(team, count, person);
   match.units[team] += count;
   addPoints(team, person, points);
   match.lastUser = person.name;
@@ -114,7 +132,6 @@ function strike(team, person, value, kind, gift = "") {
     (gift ? " com " + gift : " pelo chat") + "!";
   io.emit("attack", { team, count, points, kind, gift, name: person.name });
   publish();
-  if (match.hp[opponent] <= 0) endRound(team);
 }
 function receiveGift(raw) {
   if (raw?.giftType === 1 && raw.repeatEnd === false) return;
@@ -122,7 +139,7 @@ function receiveGift(raw) {
   const name = giftName(raw);
   const team = teamFromGift(name) || teamFor(person.id);
   const diamonds = giftValue(raw);
-  // Uma flor/rosa invoca reforços; presentes maiores também aumentam o dano.
+  // Uma flor/rosa invoca reforços; presentes maiores adicionam mais combatentes.
   strike(team, person, Math.max(8, Math.min(450, diamonds * 8)), "gift", name);
 }
 function receiveChat(raw) {
@@ -155,7 +172,7 @@ function receiveLikes(raw) {
 }
 app.use(express.json({ limit: "8kb" }));
 app.use(express.static(path.join(root, "public")));
-app.get("/api/health", (_req, res) => res.json({ ok: true, configured: !!USERNAME, connected: match.connected, round: match.round }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, configured: !!USERNAME, connected: match.connected, battleId: match.battleId }));
 // Simulação apenas para navegador no próprio computador, nunca liberada na internet.
 function isLocal(req) {
   return ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress);
@@ -169,23 +186,27 @@ app.post("/api/demo", (req, res) => {
   else if (action === "megaYellow") strike("yellow", person, 150, "gift", "Super presente");
   else if (action === "megaBlue") strike("blue", person, 150, "gift", "Super presente");
   else if (action === "likes") receiveLikes({ likeCount: 50 });
-  else if (action === "reset") { scores.yellow.clear(); scores.blue.clear(); match = freshMatch(match.round + 1); io.emit("reset", { round: match.round }); publish(); }
+  else if (action === "reset") resetBattle();
   else return res.status(400).json({ error: "Ação desconhecida" });
   res.json({ ok: true });
 });
 io.on("connection", socket => {
   socket.emit("init", { ...publicState(), demo: ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(socket.handshake.address) });
 });
+let previousStep = performance.now();
+let accumulated = 0;
 setInterval(() => {
-  if (match.status !== "playing") return;
-  match.seconds = Math.max(0, match.seconds - 1);
-  if (!match.seconds) {
-    const winner = match.hp.yellow === match.hp.blue
-      ? (match.points.yellow >= match.points.blue ? "yellow" : "blue")
-      : (match.hp.yellow > match.hp.blue ? "yellow" : "blue");
-    endRound(winner);
-  } else publish();
-}, 1000);
+  const now = performance.now();
+  accumulated += Math.min(1000, now - previousStep); previousStep = now;
+  while (accumulated >= COMBAT.stepMs) {
+    accumulated -= COMBAT.stepMs;
+    if (match.status === "playing") {
+      const result = battle.step(match.hp, Date.now() < match.powerUntil);
+      if (result.winner) endRound(result.winner);
+    }
+  }
+  publish();
+}, COMBAT.stepMs);
 async function connectLive() {
   if (!USERNAME) {
     console.log("Modo teste local: adicione TIKTOK_USERNAME no arquivo .env para conectar à LIVE.");

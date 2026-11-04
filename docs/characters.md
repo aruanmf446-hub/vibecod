@@ -1,5 +1,7 @@
 # Reformulação visual dos personagens
 
+> Registro da entrega visual `c9e9d5d`. O funcionamento foi ampliado depois, a pedido do usuário: veja [duelos contínuos](duels.md) para o estado atual.
+
 ## Inspeção e escopo
 
 Base inspecionada: `main`, commit `38e91b0`. Projeto vanilla HTML/CSS/JavaScript, Express e Socket.IO. Arena em Canvas 2D (`public/game.js`, 540×650), ajustada pelo CSS existente. O layout do código é diferente da imagem de referência fornecida; a interface real foi preservada integralmente.
