@@ -9,7 +9,10 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { Server } from "socket.io";
-import { TikTokLiveConnection } from "tiktok-live-connector";
+import { TikTokLiveConnection, RoomIdRouteConfig } from "tiktok-live-connector";
+
+// Community mode: do not fall back to Euler's paid room lookup.
+RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute = true;
 
 const PORT = Math.max(1, Number(process.env.PORT) || 3000);
 const USERNAME = String(process.env.TIKTOK_USERNAME || "").trim().replace(/^@/, "");
@@ -177,7 +180,9 @@ function strike(team, person, value, kind, gift = "") {
 const GIFT_TIERS = [[1000, 80], [500, 50], [299, 35], [100, 20], [30, 10], [20, 8], [10, 5], [5, 3], [1, 1]];
 function giftFighters(diamonds) { return (GIFT_TIERS.find(([coins]) => diamonds >= coins) || [0, 1])[1]; }
 function receiveGift(raw) {
-  if (raw?.giftType === 1 && raw.repeatEnd === false) return;
+  const streak = Number(raw?.giftType ?? raw?.giftDetails?.giftType) === 1;
+  const ended = raw?.repeatEnd === true || Number(raw?.repeatEnd) === 1;
+  if (streak && !ended) return;
   const person = actor(raw);
   const name = giftName(raw);
   const team = teamFromGift(name) || teamFor(person.id);
@@ -314,7 +319,13 @@ async function connectLive() {
     return;
   }
   try {
-    currentConnection = new TikTokLiveConnection(USERNAME, { enableExtendedGiftInfo: true });
+    currentConnection = new TikTokLiveConnection(USERNAME, {
+      // Native gift events already carry giftDetails (name, diamonds, type).
+      // The optional catalog invokes a Business-only signing route in 2.5.0.
+      enableExtendedGiftInfo: false,
+      // Initial batches may contain past gifts; only new live events affect play.
+      processInitialData: false
+    });
     const connection = currentConnection;
     connection.on("gift", fromLive("gifts", receiveGift));
     connection.on("chat", fromLive("chats", receiveChat));

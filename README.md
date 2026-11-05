@@ -8,7 +8,7 @@ Jogo de batalha de torres **não oficial**, criado para lives interativas no Tik
 3. Dê dois cliques em `INICIAR.bat` (ele instala as dependências na primeira execução).
 4. Abra **http://localhost:3000**. Sem TikTok configurado, teste pelos botões de simulação na tela (somente localhost).
 
-Para conectar a LIVE, copie `.env.exemplo` para `.env`, preencha `TIKTOK_USERNAME` **sem @**, salve e reinicie o servidor. O perfil deve estar ao vivo.
+Para conectar a LIVE, copie `.env.exemplo` para `.env`, preencha `TIKTOK_USERNAME` **sem @**, salve e reinicie o servidor. O perfil deve estar ao vivo. A conexão usa o fluxo comunitário, sem catálogo extra pago: [diagnóstico e limites](docs/conexao-gratuita.md).
 
 ## Regras
 - 🍦 **Sorvete (Ice Cream Cone)** = equipe amarela **Vingadores**. O TikTok não tem presente "Flor"; o nome Flower continua aceito, caso volte a existir.
