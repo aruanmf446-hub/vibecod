@@ -4,7 +4,7 @@ import path from 'node:path';
 
 // Only trusted server announcements can request synthesis; HTTP can only retrieve clips.
 export function createPiperTts({ enabled = false, root = '.', python = 'python3', model = '/opt/piper/voices/pt_BR-faber-medium.onnx', comments = false, spawnWorker = spawn, timeoutMs = 45000 } = {}) {
-  let worker = null, line = '', retryAt = 0;
+  let worker = null, line = '', retryAt = 0, samplePromise = null, sampleExpires = 0;
   const jobs = new Map(), clips = new Map();
   function prune() {
     const now = Date.now();
@@ -61,12 +61,23 @@ export function createPiperTts({ enabled = false, root = '.', python = 'python3'
   }
   return {
     enabled,
+    sample() {
+      if (!enabled) return Promise.resolve(null);
+      if (!samplePromise || Date.now() >= sampleExpires) {
+        sampleExpires = Date.now() + 240000;
+        samplePromise = generate('Voz ativada. Prontos para a batalha!').then(clip => {
+          if (!clip) { sampleExpires = Date.now() + 30000; return null; }
+          return clips.get(clip.audioUrl.split('/').pop())?.wav || null;
+        });
+      }
+      return samplePromise;
+    },
     publish(data, send) {
       prune();
       if (!enabled || (data.kind === 'comment' && !comments)) { send(data); return; }
       void generate(data.speech).then(clip => send({ ...data, ...clip }));
     },
     get(id) { prune(); return clips.get(id)?.wav || null; },
-    close() { fail(); clips.clear(); }
+    close() { fail(); clips.clear(); samplePromise = null; sampleExpires = 0; }
   };
 }

@@ -10,7 +10,7 @@ RUN --mount=type=secret,id=build_ca \
     apt-get update; \
     apt-get install -y --no-install-recommends python3 python3-venv libgomp1 ca-certificates; \
     rm -rf /var/lib/apt/lists/*; \
-    npm install --omit=dev --no-package-lock; npm cache clean --force; \
+    PIPER_SKIP_SETUP=1 npm install --omit=dev --no-package-lock; npm cache clean --force; \
     python3 -m venv /opt/piper/venv; \
     /opt/piper/venv/bin/pip install --no-cache-dir -r /tmp/piper-requirements.txt; \
     mkdir -p /opt/piper/voices; \

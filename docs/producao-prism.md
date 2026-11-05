@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `3288e7f01c16` |
+| Impressão digital do código | `cda76f3d7a2b` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -149,3 +149,10 @@ Validação: 27 testes passaram, npm run check e node --check announcer.mjs pass
 ### Atualização: Piper brasileiro preparado
 
 A pendência de voz externa da seção anterior foi implementada usando Piper local em CPU, sem API paga. Ver [docs/piper.md](piper.md), [ouvir exemplo](piper-example.wav) e [captura com voz](visual-piper.png). Botão Ativar voz separado dos efeitos; geração única por anúncio, cache e fila limitada. São 31 testes aprovados, QA completo do combate e teste real de WAV/reprodução no navegador. Docker construído e executado sem privilégios; os limites solicitados de CPU/memória não foram aplicados pelo ambiente de teste, portanto a viabilidade no Render Free ainda precisa ser confirmada no preview. O benchmark real do worker teve pico de 187,8 MB. Nada foi publicado ou alterado no Render.
+
+
+### Publicação autorizada no serviço principal
+
+Em 05/11/2026, o usuário autorizou usar o principal, substituindo a restrição anterior de manter tudo apenas em preview. O serviço `batalha-torres` continua no plano Free, runtime Node e mesmo URL. A documentação atual do Render confirma Python disponível no runtime Node. Assim, `npm install` executa `scripts/setup-piper.mjs` via postinstall para criar `.piper/venv` e baixar a voz no build, sem exigir mudança de runtime ou outro serviço. No Render o Piper fica ativo por padrão; `PIPER_ENABLED=false` desliga instalação/voz. Configurações da live são preservadas.
+
+`GET /api/narration/sample` gera uma frase fixa, compartilhada e em cache por 4 minutos, sem aceitar texto e sem afetar unidades/pontos. O toque em Ativar voz reproduz essa amostra real para verificar o áudio, e mostra Preparando voz durante o carregamento. 32 testes passaram, instalação nativa e reprodução real do WAV foram verificadas localmente. A publicação deve ser confirmada pelo commit/fingerprint no /api/health e pela resposta WAV no endereço público; aprovação de merge não é confirmação de deploy.

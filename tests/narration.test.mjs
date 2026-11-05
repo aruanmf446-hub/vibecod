@@ -37,3 +37,9 @@ test('timeout usa texto e comentários exigem opt-in no servidor',async()=>{
  assert.equal(await publish(f.service,comment),comment);assert.equal(f.child,undefined);
  assert.equal((await publish(f.service)).audioUrl,undefined);f.service.close();
 });
+
+test('amostra pública tem texto fixo e pedidos simultâneos não repetem a geração',async()=>{
+ const f=fixture();const first=f.service.sample(),second=f.service.sample();
+ assert.equal(f.received.length,1);assert.equal(f.received[0].text,'Voz ativada. Prontos para a batalha!');
+ answer(f,f.received[0].id);assert.deepEqual(await first,await second);await f.service.sample();assert.equal(f.received.length,1);f.service.close();
+});

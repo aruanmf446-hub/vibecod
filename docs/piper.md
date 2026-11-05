@@ -26,7 +26,13 @@ PIPER_ENABLED=true PIPER_PYTHON="$PWD/.venv-piper/bin/python" PIPER_MODEL=/tmp/p
 
 O worker atual usa `resource` do Linux. Windows nativo não foi testado; usar Docker/WSL para a preparação local. Sem Piper ativado, o caminho Node anterior continua funcionando.
 
-## Pacote Docker para testar no Render
+## Instalação no serviço principal Node do Render
+
+O serviço existente pode ser mantido: conforme https://render.com/docs/native-runtimes, Python também está presente no runtime Node. O postinstall de `npm install` executa `scripts/setup-piper.mjs` somente no Render, criando a venv e o modelo em `.piper/`. O servidor encontra esses arquivos automaticamente e ativa a voz. `PIPER_ENABLED=false` desliga o recurso. O plano e o endereço do serviço não precisam mudar. Os arquivos gerados são ignorados no Git e só existem no build/runtime.
+
+Ao tocar em Ativar voz, o navegador toca uma frase fixa gerada pelo servidor em `/api/narration/sample`. É um teste sem presente e sem alteração na batalha, com geração compartilhada em cache por 4 minutos. Não aceita texto dos visitantes. O botão mostra Preparando voz enquanto carrega. São 32 testes aprovados, incluindo cache da amostra.
+
+## Alternativa: pacote Docker
 
 O Dockerfile inclui Node 24, Python, Piper 1.8.0, ONNX Runtime 1.31.1 e o modelo, baixado somente durante o build. O processo roda como usuário sem privilégios. O modelo não está no GitHub e a página não baixa seus 61 MB: só recebe pequenos WAVs gerados. `.dockerignore` exclui `.env`, `.git`, logs e arquivos ZIP. Um mount opcional `build_ca` atende proxies corporativos; não é necessário no Render comum e não entra na imagem.
 

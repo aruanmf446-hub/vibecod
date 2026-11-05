@@ -6,8 +6,9 @@
   "description": "Batalha de torres fanmade interativa com TikTok LIVE",
   "scripts": {
     "start": "node server.mjs",
-    "check": "node --check server.mjs && node --check battle.mjs && node --check version.mjs && node --check public/game.js && node --check public/characters.js",
-    "test": "node --test"
+    "check": "node --check server.mjs && node --check battle.mjs && node --check version.mjs && node --check public/game.js && node --check public/characters.js && node --check narration.mjs && node --check announcer.mjs && node --check scripts/setup-piper.mjs",
+    "test": "node --test",
+    "postinstall": "node scripts/setup-piper.mjs"
   },
   "engines": {
     "node": ">=20"

@@ -17,8 +17,9 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 const root = path.dirname(fileURLToPath(import.meta.url));
-const narration = createPiperTts({ root, enabled: process.env.PIPER_ENABLED === "true",
-  python: process.env.PIPER_PYTHON || "python3", model: process.env.PIPER_MODEL || "/opt/piper/voices/pt_BR-faber-medium.onnx",
+const narration = createPiperTts({ root, enabled: process.env.PIPER_ENABLED === "true" || (Boolean(process.env.RENDER) && process.env.PIPER_ENABLED !== "false"),
+  python: process.env.PIPER_PYTHON || (process.env.RENDER ? path.join(root, ".piper/venv/bin/python") : "python3"),
+  model: process.env.PIPER_MODEL || (process.env.RENDER ? path.join(root, ".piper/voices/pt_BR-faber-medium.onnx") : "/opt/piper/voices/pt_BR-faber-medium.onnx"),
   comments: process.env.PIPER_COMMENTS === "true" });
 process.once?.("exit", () => narration.close());
 const announce = createAnnouncer({ emit: (event, data) => narration.publish(data, ready => io.emit(event, ready)),
@@ -199,8 +200,8 @@ function receiveLikes(raw) {
 }
 app.use(express.json({ limit: "8kb" }));
 app.use(express.static(path.join(root, "public")));
-app.get("/api/narration/:id", (req, res) => {
-  const audio = narration.get(req.params.id);
+app.get("/api/narration/:id", async (req, res) => {
+  const audio = req.params.id === "sample" ? await narration.sample() : narration.get(req.params.id);
   if (!audio) return res.status(404).end();
   res.set("Content-Type", "audio/wav"); res.set("Cache-Control", "private, max-age=60");
   res.set("X-Content-Type-Options", "nosniff"); res.send(audio);

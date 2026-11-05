@@ -96,7 +96,7 @@
     });
     return { play, duck(active) { if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0; } };
   })();
-  let voiceEnabled = false, voiceAudio = null;
+  let voiceEnabled = false, voiceStarting = false, voiceAudio = null;
   const voiceButton = $("voiceToggle");
   function stopVoice() {
     voiceEnabled = false; voiceAudio?.pause(); sound.duck(false);
@@ -104,8 +104,10 @@
     voiceButton.setAttribute?.("aria-pressed", "false");
   }
   voiceButton.addEventListener("click", async () => {
+    if (voiceStarting) return;
     if (voiceEnabled) { stopVoice(); return; }
     if (!state?.narrationAvailable || !window.Audio) return;
+    voiceStarting = true; voiceButton.disabled = true; voiceButton.textContent = "Preparando voz…";
     try {
       if (!voiceAudio) {
         voiceAudio = new window.Audio(); voiceAudio.volume = .85;
@@ -114,11 +116,13 @@
         voiceAudio.onerror = stopVoice;
       }
       // Unlock this exact media element with a real user gesture (required by iOS).
-      voiceAudio.src = "/assets/announcers/unlock.wav";
+      voiceAudio.src = "/api/narration/sample";
       await voiceAudio.play();
+      if (document.hidden) { stopVoice(); return; }
       voiceEnabled = true; voiceButton.textContent = "Silenciar voz";
       voiceButton.setAttribute?.("aria-pressed", "true");
     } catch { stopVoice(); }
+    finally { voiceStarting = false; voiceButton.disabled = !state?.narrationAvailable; }
   });
   document.addEventListener?.("visibilitychange", () => { if (document.hidden) stopVoice(); });
   function number(value) { return Math.round(Number(value) || 0).toLocaleString("pt-BR"); }
@@ -129,8 +133,8 @@
     if (stateArg.winner && !state?.winner) victoryAt = performance.now();
     if (!stateArg.winner) victoryAt = 0;
     state = stateArg;
-    voiceButton.disabled = !state.narrationAvailable;
-    if (!voiceEnabled) voiceButton.textContent = state.narrationAvailable ? "Ativar voz" : "Voz não configurada";
+    voiceButton.disabled = !state.narrationAvailable || voiceStarting;
+    if (!voiceEnabled && !voiceStarting) voiceButton.textContent = state.narrationAvailable ? "Ativar voz" : "Voz não configurada";
     syncCombat(stateArg);
     $("yellowHpText").textContent = number(state.hp.yellow);
     $("blueHpText").textContent = number(state.hp.blue);
