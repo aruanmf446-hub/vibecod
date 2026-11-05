@@ -9,7 +9,7 @@ O ensaio é **isolado neste aparelho**. O mesmo `Battle` do servidor é usado lo
 1. Voz e Mostrar comentários vêm habilitados. O navegador tenta iniciar a voz automaticamente.
 2. Se o iPhone bloquear o áudio, toque uma vez em qualquer botão de teste ou em Liberar voz. Nenhum código pode garantir áudio automático quando iOS/PRISM exige gesto. A primeira preparação pode levar cerca de 20–30 segundos no Free.
 3. **Rosa · Lucas**: personagem azul, balão agradecendo Lucas, voz brasileira e combatente azul.
-4. **Flor · Lucas**: personagem amarelo, agradecimento e combatente amarelo.
+4. **Sorvete · Lucas**: personagem amarelo, agradecimento e combatente amarelo.
 5. **Estrela · Júnior**: exemplo de presente genérico para o time azul, como se Júnior tivesse escolhido esse time. Em eventos reais, presentes genéricos continuam seguindo o time do participante.
 6. **Comentário · Maria**: balão e voz de um comentário de exemplo, sem invocar unidade.
 7. **Reforços**: adicionam 19 combatentes do time, respeitando a fila e limite do mesmo motor.
@@ -23,7 +23,7 @@ Antes de transmitir a partida real, sair do ensaio ou usar https://batalha-torre
 
 O ensaio verifica imagem, personagens, fila, duelos, balões, Piper, áudio no navegador e resultado. **Não comprova que o TikTok está conectado.** O painel mostra separadamente a conta configurada e o estado da conexão real.
 
-O servidor continua identificando comentários/presentes pela biblioteca `tiktok-live-connector`; PRISM apenas transmite a página. Rosa/Flor têm time próprio; demais presentes seguem o time escolhido/atribuído. Combos só invocam e agradecem no evento final. Teste automatizado injeta eventos na conexão simulada da biblioteca para confirmar nome, presente, quantidade, time e agradecimento. A confirmação real exige conta pública ao vivo e um evento real recebido; sem isso não se deve prometer que a integração da live foi validada.
+O servidor continua identificando comentários/presentes pela biblioteca `tiktok-live-connector`; PRISM apenas transmite a página. Rosa/Sorvete têm time próprio; demais presentes seguem o time escolhido/atribuído. Combos só invocam e agradecem no evento final. Teste automatizado injeta eventos na conexão simulada da biblioteca para confirmar nome, presente, quantidade, time e agradecimento. A confirmação real exige conta pública ao vivo e um evento real recebido; sem isso não se deve prometer que a integração da live foi validada.
 
 ## Implementação e validação
 

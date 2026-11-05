@@ -131,3 +131,7 @@ test('eventos da conexão TikTok identificam doador, combo, time e agradecimento
  assert.equal(star.team,'blue');assert.match(star.speech,/Lucas.*estrela.*X-Men/);
  assert.equal(h.publicState().narrationComments,true);
 });
+test('Sorvete (Ice Cream Cone) invoca Vingadores e Rosa invoca X-Men',()=>{
+  const h=harness();h.receiveGift(gift('Ice Cream Cone',3));h.receiveGift(gift('Rose',2));
+  const state=h.publicState();assert.equal(state.units.yellow,3);assert.equal(state.units.blue,2);
+});

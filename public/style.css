@@ -27,3 +27,6 @@ body{display:block}#app{width:calc(100% - clamp(42px,10vw,120px));max-width:900p
 .rehearsal-mode .rehearsal-panel{position:fixed;bottom:6px;left:8px;width:calc(100% - clamp(42px,10vw,120px) - 8px);max-width:900px;max-height:35svh;overflow:auto;z-index:30;margin:0;box-shadow:0 -6px 24px #0009}.rehearsal-panel>p:first-of-type{margin:5px 0;font-size:10px}.brandline{-webkit-touch-callout:none}
 
 .rehearsal-heading{display:flex;align-items:center;justify-content:space-between;gap:5px}.rehearsal-heading strong{font-size:11px}.rehearsal-heading button{min-height:32px;font-size:10px;padding:4px}.rehearsal-heading a{font-size:11px;padding:6px}
+
+/* Narrator bubble sits just below the arena so it never covers towers or fighters. */
+.notice-dock{position:relative;height:0;z-index:20}.notice-dock .announcer{top:4px;left:2%;right:2%}

@@ -26,7 +26,7 @@ const announce = createAnnouncer({ emit: (event, data) => narration.publish(data
   apiKey: process.env.GROQ_API_KEY || "", model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile" });
 const rehearsalFixtures = Object.freeze({
   rose: announcementFor({ team: 'blue', kind: 'gift', name: 'Lucas', gift: 'Rosa', count: 1 }),
-  flower: announcementFor({ team: 'yellow', kind: 'gift', name: 'Lucas', gift: 'Flor', count: 1 }),
+  flower: announcementFor({ team: 'yellow', kind: 'gift', name: 'Lucas', gift: 'Sorvete', count: 1 }),
   star: announcementFor({ team: 'blue', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
   comment: announcementFor({ team: 'yellow', kind: 'comment', name: 'Maria', message: 'Vai, Vingadores! Vamos vencer essa batalha!' })
 });
@@ -97,7 +97,8 @@ function teamFromChat(message) {
 function teamFromGift(name) {
   const word = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   if (/\brose\b|\brosa\b/.test(word)) return "blue";
-  if (/\bflower\b|\bflor\b|\bsunflower\b|\bdaisy\b|\btulip\b|\bgirassol\b/.test(word)) return "yellow";
+  // O TikTok não tem presente "Flor": o Sorvete (Ice Cream Cone, 1 moeda) invoca os Vingadores.
+  if (/\bice ?cream\b|\bsorvete\b|\bflower\b|\bflor\b|\bsunflower\b|\bdaisy\b|\btulip\b|\bgirassol\b/.test(word)) return "yellow";
   return null;
 }
 function giftName(raw) {
@@ -124,7 +125,7 @@ function resetBattle() {
   scores.yellow.clear(); scores.blue.clear();
   battle = new Battle();
   match = { ...freshMatch(), ...live };
-  lastNews = "Nova batalha! Envie Flor ou Rosa para invocar combatentes.";
+  lastNews = "Nova batalha! Envie Sorvete ou Rosa para invocar combatentes.";
   io.emit("reset", { battleId: match.battleId });
   for (const r of pending) strike(r.team, r.person, r.value, r.kind, r.gift);
   publish();
@@ -244,7 +245,7 @@ app.post("/api/demo", (req, res) => {
   if (!isLocal(req)) return res.status(403).json({ error: "Simulação disponível apenas em localhost." });
   const action = String(req.body?.action || "");
   const person = { id: "demo-" + action, name: "Teste local" };
-  if (action === "flower") receiveGift({ user: { uniqueId: person.id, nickname: person.name }, giftName: "Flower", diamondCount: 1, repeatCount: 1 });
+  if (action === "flower") receiveGift({ user: { uniqueId: person.id, nickname: person.name }, giftName: "Ice Cream Cone", diamondCount: 1, repeatCount: 1 });
   else if (action === "rose") receiveGift({ user: { uniqueId: person.id, nickname: person.name }, giftName: "Rose", diamondCount: 1, repeatCount: 1 });
   else if (action === "megaYellow") strike("yellow", person, 150, "gift", "Super presente");
   else if (action === "megaBlue") strike("blue", person, 150, "gift", "Super presente");
