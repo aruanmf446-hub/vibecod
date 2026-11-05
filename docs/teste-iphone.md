@@ -1,6 +1,6 @@
 # Ensaio no iPhone, sem live e sem pagar presente
 
-Abra **https://batalha-torres.onrender.com/#teste** no Safari ou no widget Web do PRISM. Alternativas: toque em **Testar sem live** na página normal, ou segure o título por 2 segundos. O painel de botões só aparece no modo de ensaio; o link normal permanece sem esses controles.
+Abra **https://batalha-torres.onrender.com/#teste** no Safari ou no widget Web do PRISM. Na produção, entre pelo link com **#teste**. No localhost, também pode tocar em **Testar sem live** ou segurar o título por 2 segundos. O painel de botões só aparece no modo de ensaio; o link normal permanece sem esses controles.
 
 O ensaio é **isolado neste aparelho**. O mesmo `Battle` do servidor é usado localmente para demonstrar unidades, duelos e vitória, mas nenhum comando é enviado para alterar o jogo público. O servidor só fornece mensagens fixas e áudio em cache. Não precisa de PIN/senha porque não dá acesso a controles da batalha pública. A rota de simulação antiga `/api/demo` continua bloqueada na hospedagem.
 
@@ -60,6 +60,16 @@ O desbloqueio automático da voz agora ocorre no `click`, depois da ação do bo
 
 ## Nova música de fundo
 
-Trilha instrumental original local de 34 segundos em loop, cerca de 400 KB. Começa no primeiro toque em qualquer controle, respeitando o bloqueio de autoplay do iPhone. **♫ Música ligada** desliga só a música; **♫ Ativar música** volta a ligar. Efeitos e voz têm controles separados. O volume da trilha cai durante os agradecimentos e volta suavemente ao terminar. Ao ocultar a página, a trilha para; tenta voltar quando a página reaparece. Se o iOS bloquear, tocar novamente no botão de música.
+Trilha instrumental original local de 34 segundos em loop, cerca de 400 KB. Na produção, tenta começar automaticamente, junto com os efeitos. No ensaio/localhost, começa no primeiro toque. As permissões de autoplay do iPhone continuam sendo respeitadas. **♫ Música ligada** desliga só a música; **♫ Ativar música** volta a ligar. Efeitos e voz têm controles separados. O volume da trilha cai durante os agradecimentos e volta suavemente ao terminar. Ao ocultar a página, a trilha para; tenta voltar quando a página reaparece. Se o iOS bloquear, tocar novamente no botão de música.
 
 No PRISM, manter **Áudio do App** acima de zero. Não precisa ativar microfone para capturar o áudio do jogo. A confirmação de captura no iPhone físico segue pendente. [Ouvir o MP3 original](../public/assets/audio/arena-theme.mp3).
+
+## Produção limpa para o preview do PRISM
+
+Usar **https://batalha-torres.onrender.com/** no widget da transmissão. Controles de efeitos, música, voz, Mostrar comentários e Testar sem live ficam ocultos desde o primeiro desenho da página, inclusive antes de conectar o Socket.IO. A faixa de desbloqueio de voz também não aparece na transmissão. Voz, leitura de comentários, balões e redução de volume da trilha continuam habilitados; esconder a caixa de seleção não desliga os comentários.
+
+A produção tenta iniciar música e efeitos automaticamente, sem depender de um botão no preview. O teste cobre um WebView que permite autoplay e um navegador restritivo que exige um gesto; nenhuma implementação pode anular a política de áudio do iOS. Caso o PRISM bloqueie áudio, a liberação precisa acontecer no próprio WebView/aplicativo antes da transmissão; liberar áudio no Safari não transfere permissão para o PRISM.
+
+Os controles continuam em **/#teste**, separado da batalha pública, e em localhost. Sair do ensaio retorna à página limpa. Long-press em produção não abre o painel. Alterar o hash para #teste também funciona com a página já aberta.
+
+Validação: `npm run check`, 49 testes e QA de produção com autoplay permitido/restrito, efeitos ativos sem botão, música, entrada/saída do #teste e ausência de overflow/exceções em 390×844, 720×1280 e 1080×1920. `scripts/verify-music.cjs` confere separadamente o áudio local, loop, controles do ensaio e redução do ganho durante Piper. Captura: `visual-prism-clean.png`. iPhone/PRISM físico não foram controlados por estas ferramentas.

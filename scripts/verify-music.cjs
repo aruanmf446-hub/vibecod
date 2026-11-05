@@ -26,7 +26,7 @@ const assert = require('node:assert/strict');
     const page = await context.newPage(), errors = [], loads = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('request', r => { if (r.url().includes('arena-theme.mp3')) loads.push(r.url()); });
-    await page.goto(base); await page.waitForTimeout(500);
+    await page.goto(base + (remote ? '/#teste' : '')); await page.waitForTimeout(500);
     assert.equal(await page.evaluate(() => qaMusic.starts), 0);
     assert.equal(loads.length, 0, 'a música não baixa antes do primeiro gesto');
     await page.locator('#musicToggle').click();

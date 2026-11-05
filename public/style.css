@@ -35,3 +35,9 @@ body{display:block}#app{width:calc(100% - clamp(42px,10vw,120px));max-width:900p
 .rehearsal-launcher{position:fixed;left:12px;bottom:12px;z-index:31;padding:12px 18px;background:#213553;color:#fff0ba;border:2px solid #edb260;border-radius:9px;font:800 13px system-ui;box-shadow:0 3px 15px #0007}.rehearsal-launcher:disabled{opacity:.8}.rehearsal-heading strong{font-size:10px}
 
 .comment-controls{flex-wrap:wrap}#openRehearsal{font-size:11px}
+
+/* Clean broadcast by default, including the first paint before Socket.IO connects. */
+#soundToggle,.comment-controls,#voiceUnlock{display:none}
+.controls-visible #soundToggle{display:inline-block}
+.controls-visible .comment-controls{display:flex}
+.controls-visible #voiceUnlock:not([hidden]){display:block}
