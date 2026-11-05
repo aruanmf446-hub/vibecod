@@ -98,12 +98,17 @@ function teamFromChat(message) {
   if (["2", "azul", "blue", "xmen", "mutantes", "mutants"].includes(word)) return "blue";
   return null;
 }
+// Tabela de presentes por time (nomes do TikTok, comparados sem acento/espaço/maiúscula).
+const GIFT_TEAMS = {
+  yellow: ["Ice Cream Cone", "Sorvete", "Wave Firework", "Courage Potion", "Rage Mode", "Energy Capsule",
+    "Power Chip", "Boxing Gloves", "Money Gun", "Galaxy", "Flower", "Flor", "Sunflower", "Girassol"],
+  blue: ["Rose", "Rosa", "Finger Heart", "Magic Feather", "Mushroom", "Ghostfire", "Danger Door",
+    "Butterfly for You", "Gem Gun", "Magic Potion"]
+};
+const giftKey = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const GIFT_TEAM = new Map(Object.entries(GIFT_TEAMS).flatMap(([team, names]) => names.map(n => [giftKey(n), team])));
 function teamFromGift(name) {
-  const word = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  if (/\brose\b|\brosa\b/.test(word)) return "blue";
-  // O TikTok não tem presente "Flor": o Sorvete (Ice Cream Cone, 1 moeda) invoca os Vingadores.
-  if (/\bice ?cream\b|\bsorvete\b|\bflower\b|\bflor\b|\bsunflower\b|\bdaisy\b|\btulip\b|\bgirassol\b/.test(word)) return "yellow";
-  return null;
+  return GIFT_TEAM.get(giftKey(name)) || null;
 }
 function giftName(raw) {
   return String(raw?.giftName || raw?.extendedGiftInfo?.name || raw?.giftDetails?.giftName ||

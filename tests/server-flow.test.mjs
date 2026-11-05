@@ -152,3 +152,9 @@ test('seguir e compartilhar invocam 1 combatente com limite por pessoa',async()=
   later.connections[0].emit('share',fan);later.advance(61);later.connections[0].emit('share',fan);
   assert.equal(later.publicState().units.yellow+later.publicState().units.blue,2);
 });
+test('tabela de presentes: cada presente vai para o time certo',()=>{
+  const y=['Ice Cream Cone','Wave Firework','Courage Potion','Rage Mode','Energy Capsule','Power Chip','Boxing Gloves','Money Gun','Galaxy'];
+  const b=['Rose','Finger Heart','Magic Feather','Mushroom','Ghostfire','Danger Door','Butterfly for You','Gem Gun','Magic Potion'];
+  for(const n of y){const h=harness({IDLE_SPAWN_SECONDS:'0'});h.receiveGift(gift(n));assert.equal(h.publicState().units.yellow,1,n);}
+  for(const n of b){const h=harness({IDLE_SPAWN_SECONDS:'0'});h.receiveGift(gift(n));assert.equal(h.publicState().units.blue,1,n);}
+});

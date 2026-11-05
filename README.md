@@ -14,6 +14,7 @@ Para conectar a LIVE, copie `.env.exemplo` para `.env`, preencha `TIKTOK_USERNAM
 - 🍦 **Sorvete (Ice Cream Cone)** = equipe amarela **Vingadores**. O TikTok não tem presente "Flor"; o nome Flower continua aceito, caso volte a existir.
 - 🌹 **Rosa/Rose** = equipe azul **X-Men**.
 - Chat `1` / `vingadores` = amarelo; `2` / `xmen` = azul.
+- Tabela de presentes: Vingadores = Sorvete, Wave Firework, Courage Potion, Rage Mode, Energy Capsule, Power Chip, Boxing Gloves, Money Gun, Galaxy. X-Men = Rosa, Finger Heart, Magic Feather, Mushroom, Ghostfire, Danger Door, Butterfly for You, Gem Gun, Magic Potion (lista em `GIFT_TEAMS`, no `server.mjs`).
 - Outros presentes ajudam a equipe escolhida no chat (ou equipe atribuída ao usuário).
 - Curtidas alimentam a energia global; presentes invocam combatentes. Eles duelam e os sobreviventes atacam a torre adversária.
 - Sorvete/Rosa de 1 moeda invoca 1 combatente; presentes maiores invocam mais, até 57 por evento (limite de valor já existente). Até 12 por time ficam ativos; os demais aguardam espaço na fila.
