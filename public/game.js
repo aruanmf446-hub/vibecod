@@ -131,11 +131,20 @@
       if (context && context.state !== "running") void context.resume().catch(() => {});
       if (event.target !== musicButton && musicWanted) void startMusic();
     });
+    function resumeAudio() {
+      if (!context || document.hidden) return;
+      // iOS may suspend Web Audio while an HTMLAudio voice clip has focus.
+      // Resume even when the looping source still exists: startMusic alone would return early.
+      void context.resume().then(() => {
+        if (musicWanted && !musicSource) void startMusic();
+        label(); labelMusic();
+      }).catch(() => {});
+    }
     function startBroadcast() {
       try {
         ensureContext(); enabled = true; musicWanted = true;
         master.gain.value = ducked ? .08 : .3;
-        void startMusic(); label();
+        resumeAudio(); void startMusic(); label();
       } catch { label(); }
     }
     function play(kind) {
@@ -167,14 +176,32 @@
     return { play, startBroadcast, duck(active) {
       ducked = active;
       if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0;
-      if (musicGain) musicGain.gain.setTargetAtTime(active ? .08 : .35, context.currentTime, .12);
+      if (musicGain) {
+        musicGain.gain.cancelScheduledValues(context.currentTime);
+        musicGain.gain.setTargetAtTime(active ? .08 : .35, context.currentTime, .12);
+      }
+      if (!active) resumeAudio();
     } };
 
   })();
   let voiceEnabled = false, voiceStarting = false, voiceWanted = true, voiceAudio = null, autoVoiceTried = false;
   const voiceButton = $("voiceToggle");
+  let voiceReleaseTimer = null, expectedVoiceSeconds = 8;
+  function releaseVoiceMusic() {
+    clearTimeout(voiceReleaseTimer); voiceReleaseTimer = null; sound.duck(false);
+  }
+  function voicePlaying() {
+    clearTimeout(voiceReleaseTimer); sound.duck(true);
+    const seconds = Number.isFinite(voiceAudio.duration) ? Math.max(0, voiceAudio.duration - voiceAudio.currentTime) : expectedVoiceSeconds;
+    // Some WebViews omit ended after an audio-session interruption.
+    voiceReleaseTimer = setTimeout(releaseVoiceMusic, Math.min(33000, Math.max(1500, seconds * 1000 + 1500)));
+  }
+  function voiceWaiting() {
+    clearTimeout(voiceReleaseTimer);
+    voiceReleaseTimer = setTimeout(releaseVoiceMusic, 1500);
+  }
   function stopVoice(blocked = false) {
-    voiceEnabled = false; voiceAudio?.pause(); sound.duck(false);
+    voiceEnabled = false; voiceAudio?.pause(); releaseVoiceMusic();
     voiceButton.textContent = state?.narrationAvailable ? "Ativar voz" : "Voz não configurada";
     voiceButton.setAttribute?.("aria-pressed", "false");
     $("voiceUnlock").hidden = !blocked || !voiceWanted;
@@ -187,8 +214,11 @@
     try {
       if (!voiceAudio) {
         voiceAudio = new window.Audio(); voiceAudio.volume = .85;
-        voiceAudio.onplaying = () => sound.duck(true);
-        voiceAudio.onended = () => sound.duck(false);
+        voiceAudio.onplaying = voicePlaying;
+        voiceAudio.onended = releaseVoiceMusic;
+        voiceAudio.onpause = releaseVoiceMusic;
+        voiceAudio.onwaiting = voiceWaiting;
+        voiceAudio.onstalled = voiceWaiting;
         voiceAudio.onerror = () => stopVoice(true);
       }
       // Unlock this exact media element with a real user gesture (required by iOS).
@@ -348,7 +378,7 @@
         const response = await fetch('/api/rehearsal/' + kind);
         if (!response.ok) throw Error('fixture');
         const fixture = await response.json(); voiceMissing = !fixture.audioUrl;
-        if (action === 'comment') rehearsal.comment(fixture);
+        if (fixture.kind === 'comment') rehearsal.comment(fixture);
         else rehearsal.gift(fixture, action === 'yellow' || action === 'blue' ? 19 : fixture.count);
       }
       $('rehearsalResult').textContent = voiceMissing ? 'Teste de imagem executado. A voz não ficou pronta; aguarde e tente novamente.' : 'Teste executado só neste aparelho. Confira imagem, balão e voz no PRISM.';
@@ -493,7 +523,8 @@
         $("giftNotice").classList.toggle("blue", data.team === "blue");
         const duration = voiceEnabled && data.audioUrl ? Math.max(5000, Math.min(30000, data.audioDuration * 1000 + 500)) : 5000;
         giftUntil = now + duration; nextAnnouncementAt = now + duration + 500;
-        if (voiceEnabled && voiceAudio && /^\/api\/narration\/(?:[a-f0-9-]{36}|rehearsal-(?:rose|flower|star|star-yellow|comment))$/.test(data.audioUrl || "")) {
+        if (voiceEnabled && voiceAudio && /^\/api\/narration\/(?:[a-f0-9-]{36}|rehearsal-(?:rose|flower|star|star-yellow|comment|comment-blue))$/.test(data.audioUrl || "")) {
+          releaseVoiceMusic(); expectedVoiceSeconds = Number(data.audioDuration) || 8;
           voiceAudio.src = data.audioUrl;
           void voiceAudio.play().catch(() => stopVoice(true));
         }

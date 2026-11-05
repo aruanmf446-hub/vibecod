@@ -72,7 +72,7 @@ export function createPiperTts({ enabled = false, root = '.', python = 'python3'
           return clips.get(clip.audioUrl.split('/').pop())?.wav || null;
         });
         sampleCache.set(key, item);
-        while (sampleCache.size > 6) sampleCache.delete(sampleCache.keys().next().value);
+        while (sampleCache.size > 7) sampleCache.delete(sampleCache.keys().next().value);
       }
       return item.promise;
     },

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
+import { WebcastChatMessage, WebcastGiftMessage, User, Gift } from 'tiktok-live-proto/v3';
 import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -200,4 +201,37 @@ test('presentes nativos 2.5.0 sem catálogo preservam times, moedas e combo só 
  const notices=h.emissions.filter(e=>e.name==='announcement').map(e=>e.data);
  assert.equal(notices.length,2);assert.match(notices[0].speech,/Lucas.*rosa.*X-Men/i);
  assert.equal(notices[1].team,'yellow');assert.equal(notices[1].count,6);
+});
+
+
+test('schema real v3: content, usuário id e escolha de time chegam à voz e aos reforços',async()=>{
+ const h=harness({TIKTOK_USERNAME:'canal',IDLE_SPAWN_SECONDS:'0'});await h.connectLive();
+ const c=h.connections[0];
+ const native=(schema,fields)=>{const empty=new Uint8Array();const packet={...schema.decode(empty),...fields,user:{...User.decode(empty),...fields.user}};if(fields.gift)packet.gift={...Gift.decode(empty),...fields.gift};return schema.decode(schema.encode(packet).finish())};
+ const chat=(id,content)=>native(WebcastChatMessage,{user:{id,nickname:'Lucas'},content});
+ c.emit('chat',chat('701','Boa noite, quero ver essa batalha!'));
+ let notices=h.emissions.filter(e=>e.name==='announcement').map(e=>e.data);
+ assert.match(notices[0].speech,/Lucas comentou: Boa noite, quero ver essa batalha!/);
+ assert.doesNotMatch(notices[0].speech,/avante|A mim/);
+ c.emit('chat',chat('701','2'));
+ notices=h.emissions.filter(e=>e.name==='announcement').map(e=>e.data);
+ assert.equal(notices.at(-1).team,'blue');assert.match(notices.at(-1).speech,/comentou: 2.*X-Men/);
+ c.emit('chat',chat('702','1'));
+ notices=h.emissions.filter(e=>e.name==='announcement').map(e=>e.data);
+ assert.equal(notices.at(-1).team,'yellow');
+ h.advance(6);c.emit('chat',chat('701','Vai meu time!'));
+ notices=h.emissions.filter(e=>e.name==='announcement').map(e=>e.data);
+ assert.equal(notices.at(-1).team,'blue');assert.match(notices.at(-1).speech,/Vai meu time!/);
+ h.advance(6);c.emit('chat',chat('701','xmen'));
+ notices=h.emissions.filter(e=>e.name==='announcement').map(e=>e.data);
+ assert.match(notices.at(-1).speech,/comentou: xmen.*X-Men/);
+ const gift=native(WebcastGiftMessage,{user:{id:'701',nickname:'Lucas'},repeatCount:2,repeatEnd:1,gift:{name:'Presente especial',diamondCount:5,type:0}});
+ const before=h.publicState().units.blue;c.emit('gift',gift);
+ assert.equal(h.publicState().units.blue-before,6,'presente segue o time de Lucas e mantém a faixa de moedas');
+ const ongoing={...gift,repeatEnd:0,gift:{...gift.gift,name:'Rose',type:1}};
+ const units=h.publicState().units.blue;c.emit('gift',ongoing);assert.equal(h.publicState().units.blue,units);
+});
+test('comentário sem texto não vira nome seguido de grito padrão',()=>{
+ const h=harness();h.receiveChat({user:{id:'99',nickname:'Lucas'}});
+ assert.equal(h.emissions.filter(e=>e.name==='announcement').length,0);
 });

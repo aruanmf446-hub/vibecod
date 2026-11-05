@@ -32,6 +32,7 @@ const rehearsalFixtures = Object.freeze({
   flower: announcementFor({ team: 'yellow', kind: 'gift', name: 'Lucas', gift: 'Sorvete', count: 1 }),
   'star-yellow': announcementFor({ team: 'yellow', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
   star: announcementFor({ team: 'blue', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
+  'comment-blue': announcementFor({ team: 'blue', kind: 'comment', teamSelection: true, name: 'Lucas', message: '2' }),
   comment: announcementFor({ team: 'yellow', kind: 'comment', name: 'Maria', message: 'Vai, Vingadores! Vamos vencer essa batalha!' })
 });
 let lastSpokenComment = 0;
@@ -87,8 +88,8 @@ function publish() { io.emit("state", publicState()); }
 function cleanName(value) { return String(value || "Visitante").slice(0, 28); }
 function actor(raw) {
   const user = raw?.user || raw || {};
-  const id = String(user.uniqueId || user.userId || raw?.uniqueId || "anon");
-  return { id, name: cleanName(user.nickname || user.uniqueId || raw?.nickname || "Visitante") };
+  const id = String(user.id || user.userId || user.uniqueId || user.displayId || raw?.uniqueId || "anon");
+  return { id, name: cleanName(user.nickname || user.uniqueId || user.displayId || raw?.nickname || "Visitante") };
 }
 function defaultTeam(id) {
   let value = 0;
@@ -120,7 +121,7 @@ function giftName(raw) {
 }
 function giftValue(raw) {
   const per = Number(raw?.diamondCount ?? raw?.extendedGiftInfo?.diamond_count ??
-    raw?.extendedGiftInfo?.diamondCount ?? raw?.giftDetails?.diamondCount ?? 1);
+    raw?.extendedGiftInfo?.diamondCount ?? raw?.giftDetails?.diamondCount ?? raw?.gift?.diamondCount ?? 1);
   const repeat = Math.max(1, Math.floor(Number(raw?.repeatCount) || 1));
   return Math.max(1, Math.min(5000, Math.round((Number.isFinite(per) && per > 0 ? per : 1) * repeat)));
 }
@@ -180,7 +181,7 @@ function strike(team, person, value, kind, gift = "") {
 const GIFT_TIERS = [[1000, 80], [500, 50], [299, 35], [100, 20], [30, 10], [20, 8], [10, 5], [5, 3], [1, 1]];
 function giftFighters(diamonds) { return (GIFT_TIERS.find(([coins]) => diamonds >= coins) || [0, 1])[1]; }
 function receiveGift(raw) {
-  const streak = Number(raw?.giftType ?? raw?.giftDetails?.giftType) === 1;
+  const streak = Number(raw?.giftType ?? raw?.giftDetails?.giftType ?? raw?.gift?.type) === 1;
   const ended = raw?.repeatEnd === true || Number(raw?.repeatEnd) === 1;
   if (streak && !ended) return;
   const person = actor(raw);
@@ -195,14 +196,17 @@ function receiveGift(raw) {
 }
 function receiveChat(raw) {
   const person = actor(raw);
-  const team = teamFromChat(raw?.comment ?? raw?.text);
+  const message = [raw?.content, raw?.comment, raw?.text].find(value => typeof value === "string" && value.trim()) || "";
+  if (!message.trim()) return;
+  const team = teamFromChat(message);
+  const changedTeam = team && teamOf.get(person.id) !== team;
+  if (team) teamOf.set(person.id, team);
   const commentTime = Date.now();
-  if (commentTime - lastSpokenComment >= 5000) {
+  if (changedTeam || commentTime - lastSpokenComment >= 5000) {
     lastSpokenComment = commentTime;
-    announce({ kind: "comment", team: team || teamFor(person.id), name: person.name, message: raw?.comment ?? raw?.text });
+    announce({ kind: "comment", team: team || teamFor(person.id), teamSelection: Boolean(team), name: person.name, message });
   }
   if (!team) return;
-  teamOf.set(person.id, team);
   const now = Date.now();
   if (now - (chatCooldown.get(person.id) || 0) < 1800) return;
   chatCooldown.set(person.id, now);

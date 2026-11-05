@@ -11,7 +11,7 @@ O ensaio é **isolado neste aparelho**. O mesmo `Battle` do servidor é usado lo
 3. **Rosa · Lucas**: personagem azul, balão agradecendo Lucas, voz brasileira e combatente azul.
 4. **Sorvete · Lucas**: personagem amarelo, agradecimento e combatente amarelo.
 5. **Estrela · X-Men** e **Estrela · Vingadores**: exemplos para os dois times, como se Júnior tivesse escolhido cada um. Em eventos reais, presentes genéricos continuam seguindo o time do participante.
-6. **Comentário · Maria**: balão e voz de um comentário de exemplo, sem invocar unidade.
+6. **Comentário · Maria**: lê o texto do comentário, sem grito automático e sem invocar unidade. **Comentário · X-Men (2)**: lê “Lucas comentou: 2. Entrou para os X-Men!” com retrato azul, sem alterar a batalha pública.
 7. **Reforços**: adicionam 19 combatentes do time, respeitando a fila e limite do mesmo motor.
 8. **Curtidas**: quatro toques ativam o modo poder do ensaio.
 9. **Testar vitória**: reduz a torre azul para 8 HP SOMENTE no ensaio e cria combatentes amarelos; eles avançam, atacam e ganham pelo motor normal. Após 10 segundos o ensaio reinicia.
@@ -28,7 +28,7 @@ O servidor continua identificando comentários/presentes pela biblioteca `tiktok
 ## Implementação e validação
 
 - `public/rehearsal.mjs`: orquestra o ensaio, recebendo o mesmo `Battle` do servidor. Arquivo do motor é servido por GET em `/testing/battle.mjs`; o motor original não mudou.
-- `/api/rehearsal/:kind`: cinco fixtures fixas (rosa/sorvete/estrela azul/estrela amarela/comentário), formatadas pela mesma função dos anúncios reais. Não recebe texto livre, não chama Groq e não altera HP/unidades/pontos/counters da live. Áudios são gerados uma vez e compartilhados em cache.
+- `/api/rehearsal/:kind`: seis fixtures fixas (rosa/sorvete/estrela azul/estrela amarela/comentário/comentário azul), formatadas pela mesma função dos anúncios reais. Não recebe texto livre, não chama Groq e não altera HP/unidades/pontos/counters da live. Áudios são gerados uma vez e compartilhados em cache.
 - Voz desejada desde o início, tentativa automática e aviso claro quando autoplay é bloqueado. Primeira interação libera a mídia; usuário ainda pode silenciar.
 - Comentários marcados inicialmente e Piper habilitado para comentários no servidor por padrão, com amostragem de 5 segundos/fila limitada para evitar sobreposição. `PIPER_COMMENTS=false` permite desligar explicitamente.
 - `npm test`: 46 testes passaram. `npm run check` passou. QA de batalha existente passou; cancelamento intencional de mídia na navegação é distinguido de erro real de rede.
@@ -73,3 +73,7 @@ A produção tenta iniciar música e efeitos automaticamente, sem depender de um
 Os controles continuam em **/#teste**, separado da batalha pública, e em localhost. Sair do ensaio retorna à página limpa. Long-press em produção não abre o painel. Alterar o hash para #teste também funciona com a página já aberta.
 
 Validação: `npm run check`, 49 testes e QA de produção com autoplay permitido/restrito, efeitos ativos sem botão, música, entrada/saída do #teste e ausência de overflow/exceções em 390×844, 720×1280 e 1080×1920. `scripts/verify-music.cjs` confere separadamente o áudio local, loop, controles do ensaio e redução do ganho durante Piper. Captura: `visual-prism-clean.png`. iPhone/PRISM físico não foram controlados por estas ferramentas.
+
+## Comentários reais e recuperação da música
+
+Os campos atuais `content`, `user.id` e `user.displayId` passaram a ser lidos. Comentários comuns são lidos literalmente, com os limites de texto/fila já existentes. Escolhas 1/2/xmen confirmam o time; a nova escolha recebe prioridade sobre o intervalo de leitura. A música retoma o AudioContext depois da voz, ao pausar ou falhar, com recuperação por prazo caso o WebView não dispare ended. O botão de silenciar música no ensaio continua sendo respeitado. [Diagnóstico e testes](correcoes-comentarios-audio.md).

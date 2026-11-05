@@ -40,3 +40,11 @@ test('agradecimento do Sorvete fala "pelo sorvete"', () => {
   const data = announcementFor({ team: 'yellow', kind: 'gift', name: 'Ana', gift: 'Ice Cream Cone', count: 1 });
   assert.match(data.speech, /^Obrigado, Ana, pelo sorvete!/);
 });
+
+
+test('comentário lê texto literal sem grito automático; seleção confirma o time correto',()=>{
+ const ordinary=announcementFor({kind:'comment',team:'yellow',name:'Ana',message:'Como vocês estão?'});
+ assert.equal(ordinary.speech,'Ana comentou: Como vocês estão?');
+ const selected=announcementFor({kind:'comment',team:'blue',teamSelection:true,name:'Lucas',message:'2'});
+ assert.equal(selected.speech,'Lucas comentou: 2. Entrou para os X-Men!');
+});
