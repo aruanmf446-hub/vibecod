@@ -1,6 +1,6 @@
 # Ensaio no iPhone, sem live e sem pagar presente
 
-Abra **https://batalha-torres.onrender.com/#teste** no Safari ou no widget Web do PRISM. Alternativa: segure o título do jogo por 2 segundos. O painel de botões só aparece no modo de ensaio; o link normal permanece sem esses controles.
+Abra **https://batalha-torres.onrender.com/#teste** no Safari ou no widget Web do PRISM. Alternativas: toque em **Testar sem live** na página normal, ou segure o título por 2 segundos. O painel de botões só aparece no modo de ensaio; o link normal permanece sem esses controles.
 
 O ensaio é **isolado neste aparelho**. O mesmo `Battle` do servidor é usado localmente para demonstrar unidades, duelos e vitória, mas nenhum comando é enviado para alterar o jogo público. O servidor só fornece mensagens fixas e áudio em cache. Não precisa de PIN/senha porque não dá acesso a controles da batalha pública. A rota de simulação antiga `/api/demo` continua bloqueada na hospedagem.
 
@@ -10,7 +10,7 @@ O ensaio é **isolado neste aparelho**. O mesmo `Battle` do servidor é usado lo
 2. Se o iPhone bloquear o áudio, toque uma vez em qualquer botão de teste ou em Liberar voz. Nenhum código pode garantir áudio automático quando iOS/PRISM exige gesto. A primeira preparação pode levar cerca de 20–30 segundos no Free.
 3. **Rosa · Lucas**: personagem azul, balão agradecendo Lucas, voz brasileira e combatente azul.
 4. **Sorvete · Lucas**: personagem amarelo, agradecimento e combatente amarelo.
-5. **Estrela · Júnior**: exemplo de presente genérico para o time azul, como se Júnior tivesse escolhido esse time. Em eventos reais, presentes genéricos continuam seguindo o time do participante.
+5. **Estrela · X-Men** e **Estrela · Vingadores**: exemplos para os dois times, como se Júnior tivesse escolhido cada um. Em eventos reais, presentes genéricos continuam seguindo o time do participante.
 6. **Comentário · Maria**: balão e voz de um comentário de exemplo, sem invocar unidade.
 7. **Reforços**: adicionam 19 combatentes do time, respeitando a fila e limite do mesmo motor.
 8. **Curtidas**: quatro toques ativam o modo poder do ensaio.
@@ -28,10 +28,10 @@ O servidor continua identificando comentários/presentes pela biblioteca `tiktok
 ## Implementação e validação
 
 - `public/rehearsal.mjs`: orquestra o ensaio, recebendo o mesmo `Battle` do servidor. Arquivo do motor é servido por GET em `/testing/battle.mjs`; o motor original não mudou.
-- `/api/rehearsal/:kind`: quatro fixtures fixas (rosa/flor/estrela/comentário), formatadas pela mesma função dos anúncios reais. Não recebe texto livre, não chama Groq e não altera HP/unidades/pontos/counters da live. Áudios são gerados uma vez e compartilhados em cache.
+- `/api/rehearsal/:kind`: cinco fixtures fixas (rosa/sorvete/estrela azul/estrela amarela/comentário), formatadas pela mesma função dos anúncios reais. Não recebe texto livre, não chama Groq e não altera HP/unidades/pontos/counters da live. Áudios são gerados uma vez e compartilhados em cache.
 - Voz desejada desde o início, tentativa automática e aviso claro quando autoplay é bloqueado. Primeira interação libera a mídia; usuário ainda pode silenciar.
 - Comentários marcados inicialmente e Piper habilitado para comentários no servidor por padrão, com amostragem de 5 segundos/fila limitada para evitar sobreposição. `PIPER_COMMENTS=false` permite desligar explicitamente.
-- `npm test`: 37 testes passaram. `npm run check` passou. QA de batalha existente passou; cancelamento intencional de mídia na navegação é distinguido de erro real de rede.
+- `npm test`: 46 testes passaram. `npm run check` passou. QA de batalha existente passou; cancelamento intencional de mídia na navegação é distinguido de erro real de rede.
 - QA do ensaio em Chromium com política de gesto obrigatório: rosa/flor/estrela/comentário, reprodução real WAV, modo poder, vitória/reinício; comparou estado/contadores da batalha principal antes/depois e confirmou nenhuma mutação, `/api/demo` 403, sem overflow/exceções.
 - Repetir com servidor hospedado simulado (`DISABLE_DEMO=true`, Piper habilitado): `GAME_URL=http://127.0.0.1:3012 PLAYWRIGHT_MODULE=/caminho/playwright node scripts/verify-phone-rehearsal.cjs`. Requer ausência de eventos reais para comparar snapshots idênticos.
 - Captura real de teste: `phone-rehearsal.png`. iPhone físico e PRISM não foram controlados neste ambiente.
@@ -43,3 +43,11 @@ Publicado em 05/11/2026, deploy Render `dep-dblt9plckfvc739r0d0g`, commit `ecc9a
 O QA remoto foi repetido contra https://batalha-torres.onrender.com e passou: abertura por long-press, presentes fixos, comentário com reprodução real do Piper, modos poder/vitória/reinício, saída do ensaio; HP, unidades, battleId e contadores reais do principal idênticos antes/depois. `/api/demo` continuou 403. Sem overflow ou exceções JavaScript. O script agora suporta o proxy do ambiente no contexto do navegador/API; nenhuma credencial é persistida.
 
 A conta configurada continuava desconectada e os contadores reais estavam zerados. Não foram enviados presentes pagos ou mensagens ao TikTok. A consulta HTTP pública ao TikTok não forneceu metadados de live verificáveis, então não foi usada como prova de conta offline/online. Falta confirmação da conta pelo operador e teste com a transmissão TikTok ativa. O app PRISM/iPhone físico não foi controlado por estas ferramentas; a reprodução/captura final deve ser conferida no próprio aparelho.
+
+## Correções de áudio e testes em 05/11/2026
+
+- O painel fecha depois de enviar um presente de teste para não encobrir a imagem. Use **Abrir testes** para escolher outro. O retrato inteiro aparece numa faixa própria acima da arena, fora do canvas.
+- **Ativar som** inicia efeitos e uma trilha instrumental original, leve, sintetizada localmente. **Silenciar som** interrompe ambos. A música reduz de volume enquanto a voz fala e para ao ocultar a página. Não há download de música nem serviço pago.
+- No print enviado, o PRISM estava com **Áudio do App** no mínimo. Aumentar esse volume e tocar **Ativar som** no jogo. Testar primeiro no Safari; a captura de áudio no PRISM/iPhone ainda precisa de confirmação física.
+- Bloqueio real identificado nos logs do Render: `fetchWebcastSignatureFromEulerRoute` respondeu **This endpoint requires a Business plan** enquanto tentava conectar. Nenhum plano foi contratado. Em outras tentativas a conta já estava offline. A interface agora informa a exigência de plano quando recebe esse erro. Piper continua gratuito, mas o provedor atual de assinatura impede confirmar presentes reais gratuitamente. PRISM não encaminha presentes ao jogo: a biblioteca no servidor precisa estar conectada ao TikTok.
+- Validação local: 46 testes, check de sintaxe, presentes isolados nos dois times, reprodução Piper, música liga/desliga, retrato sem corte e sem overflow em 360×640, 390×844, 720×1280 e 1080×1920. Ensaio não altera a batalha pública.
