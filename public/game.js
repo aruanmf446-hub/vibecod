@@ -36,7 +36,7 @@
   const colors = { yellow: ["#ffb323", "#ffe084", "#c57322"], blue: ["#256cdb", "#90ddff", "#154a9f"] };
   // Small original Web Audio cues. Nothing starts before an explicit tap.
   const sound = (() => {
-    let context = null, master = null, enabled = false;
+    let context = null, master = null, enabled = false, musicTimer = null, musicStep = 0, ducked = false;
     const voices = new Set(), last = Object.create(null);
     const button = $("soundToggle");
     const cues = {
@@ -51,10 +51,11 @@
     };
     function label() {
       const running = enabled && context?.state === "running";
-      button.textContent = running ? "Silenciar" : "Ativar som";
+      button.textContent = running ? "Silenciar som" : "Ativar som";
       button.setAttribute?.("aria-pressed", String(Boolean(running)));
     }
     function stop() {
+      clearInterval(musicTimer); musicTimer = null;
       for (const oscillator of voices) { try { oscillator.stop(); } catch {} }
       voices.clear();
     }
@@ -71,11 +72,30 @@
           enabled = false; stop(); master.gain.value = 0;
         } else {
           await context.resume(); enabled = context.state === "running";
-          master.gain.value = enabled ? .3 : 0;
-          if (enabled) play("reset");
+          master.gain.value = enabled ? (ducked ? .08 : .3) : 0;
+          if (enabled) { play("reset"); startMusic(); }
         }
         label();
       } catch { enabled = false; label(); }
+    }
+    // Original quiet fantasy arpeggio, two short notes per second; no downloads.
+    function startMusic() {
+      if (musicTimer) return;
+      const melody = [57, 64, 69, 72, 59, 66, 71, 74, 55, 62, 67, 71, 60, 64, 67, 72];
+      const tick = () => {
+        if (!enabled || context.state !== "running" || document.hidden || voices.size >= 10) return;
+        const start = context.currentTime, end = start + .85;
+        const oscillator = context.createOscillator(), envelope = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = 440 * 2 ** ((melody[musicStep++ % melody.length] - 69) / 12);
+        envelope.gain.setValueAtTime(0, start);
+        envelope.gain.linearRampToValueAtTime(.06, start + .045);
+        envelope.gain.exponentialRampToValueAtTime(.001, end);
+        oscillator.connect(envelope); envelope.connect(master); voices.add(oscillator);
+        oscillator.onended = () => { voices.delete(oscillator); oscillator.disconnect(); envelope.disconnect(); };
+        oscillator.start(start); oscillator.stop(end + .02);
+      };
+      tick(); musicTimer = setInterval(tick, 500);
     }
     function play(kind) {
       if (!enabled || context?.state !== "running" || document.hidden) return;
@@ -101,7 +121,7 @@
     document.addEventListener?.("visibilitychange", () => {
       if (document.hidden && context) { enabled = false; stop(); master.gain.value = 0; label(); }
     });
-    return { play, duck(active) { if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0; } };
+    return { play, duck(active) { ducked = active; if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0; } };
   })();
   let voiceEnabled = false, voiceStarting = false, voiceWanted = true, voiceAudio = null, autoVoiceTried = false;
   const voiceButton = $("voiceToggle");
@@ -243,8 +263,9 @@
     });
   });
   async function startRehearsal(data) {
+    $('openRehearsal').hidden = true;
     $('rehearsalBanner').hidden = false; $('rehearsalPanel').hidden = false;
-    document.body.append($('rehearsalPanel'));
+    document.body.append($('rehearsalPanel')); document.body.append($('showRehearsalControls'));
     document.body.classList.add('rehearsal-mode');
     try {
       const [{ Battle }, { createRehearsal }] = await Promise.all([import('/testing/battle.mjs'), import('/rehearsal.mjs')]);
@@ -256,11 +277,17 @@
       diagnostics(data);
     } catch { $('rehearsalResult').textContent = 'Não foi possível carregar o ensaio. Atualize a página.'; }
   }
+  $('showRehearsalControls').addEventListener('click', () => { $('rehearsalPanel').hidden = false; $('showRehearsalControls').hidden = true; });
+  $('hideRehearsalControls').addEventListener('click', () => { $('rehearsalPanel').hidden = true; $('showRehearsalControls').hidden = false; });
   document.querySelectorAll('[data-rehearsal]').forEach(button => button.addEventListener('click', async () => {
     if (!rehearsal) return;
     button.disabled = true; let voiceMissing = false; $('rehearsalResult').textContent = 'Preparando teste e voz…';
     try {
       const action = button.dataset.rehearsal;
+      if (!['reset', 'likes'].includes(action)) {
+        $('rehearsalPanel').hidden = true; $('showRehearsalControls').hidden = false;
+        $('showRehearsalControls').textContent = 'Preparando teste…'; $('showRehearsalControls').disabled = true;
+      }
       if (action === 'reset') rehearsal.reset();
       else if (action === 'likes') rehearsal.likes();
       else if (action === 'victory') rehearsal.victory();
@@ -273,23 +300,23 @@
         else rehearsal.gift(fixture, action === 'yellow' || action === 'blue' ? 19 : fixture.count);
       }
       $('rehearsalResult').textContent = voiceMissing ? 'Teste de imagem executado. A voz não ficou pronta; aguarde e tente novamente.' : 'Teste executado só neste aparelho. Confira imagem, balão e voz no PRISM.';
-    } catch { $('rehearsalResult').textContent = 'Não foi possível preparar o teste. Aguarde e tente novamente.'; }
-    finally { button.disabled = false; }
+    } catch { $('rehearsalResult').textContent = 'Não foi possível preparar o teste. Aguarde e tente novamente.'; $('rehearsalPanel').hidden = false; $('showRehearsalControls').hidden = true; }
+    finally { button.disabled = false; $('showRehearsalControls').disabled = false; $('showRehearsalControls').textContent = 'Abrir testes'; }
   }));
   const brand = document.querySelector?.('.brandline');
   let hold;
-  brand?.addEventListener('pointerdown', () => {
+  function enterRehearsal() {
     if (rehearsalMode) return;
-    hold = setTimeout(() => {
-      rehearsalMode = true; window.history.replaceState(null, '', '#teste');
-      sprites.clear(); fallen = []; announcementQueue.length = 0; nextAnnouncementAt = 0; giftUntil = 0;
-      if (liveState) void startRehearsal(liveState);
-    }, 2000);
-  });
+    rehearsalMode = true; window.history.replaceState(null, '', '#teste');
+    sprites.clear(); fallen = []; announcementQueue.length = 0; nextAnnouncementAt = 0; giftUntil = 0;
+    if (liveState) void startRehearsal(liveState);
+  }
+  $('openRehearsal').addEventListener('click', enterRehearsal);
+  brand?.addEventListener('pointerdown', () => { if (!rehearsalMode) hold = setTimeout(enterRehearsal, 2000); });
   $('exitRehearsal').addEventListener('click', event => {
     event.preventDefault(); rehearsalMode = false; rehearsal = null; clearInterval(rehearsalTimer);
     window.history.replaceState(null, '', window.location.pathname);
-    $('rehearsalPanel').hidden = true; $('rehearsalBanner').hidden = true;
+    $('rehearsalPanel').hidden = true; $('rehearsalBanner').hidden = true; $('showRehearsalControls').hidden = true; $('openRehearsal').hidden = false;
     document.body.classList.remove('rehearsal-mode');
     announcementQueue.length = 0; nextAnnouncementAt = 0; giftUntil = 0;
     voiceAudio?.pause(); sound.duck(false); localEvents.reset?.({});
@@ -409,13 +436,14 @@
         $("giftNotice").classList.toggle("blue", data.team === "blue");
         const duration = voiceEnabled && data.audioUrl ? Math.max(5000, Math.min(30000, data.audioDuration * 1000 + 500)) : 5000;
         giftUntil = now + duration; nextAnnouncementAt = now + duration + 500;
-        if (voiceEnabled && voiceAudio && /^\/api\/narration\/(?:[a-f0-9-]{36}|rehearsal-(?:rose|flower|star|comment))$/.test(data.audioUrl || "")) {
+        if (voiceEnabled && voiceAudio && /^\/api\/narration\/(?:[a-f0-9-]{36}|rehearsal-(?:rose|flower|star|star-yellow|comment))$/.test(data.audioUrl || "")) {
           voiceAudio.src = data.audioUrl;
           void voiceAudio.play().catch(() => stopVoice(true));
         }
       }
     }
     $("giftNotice").hidden = now > giftUntil;
+    app.classList.toggle("announcer-open", now <= giftUntil);
     const countdown = $("victoryCountdown");
     countdown.hidden = !state?.winner;
     if (state?.winner) {
