@@ -25,6 +25,10 @@ Para conectar a LIVE, copie `.env.exemplo` para `.env`, preencha `TIKTOK_USERNAM
 ## Live real (PRISM no iPhone)
 O iPhone precisa abrir o jogo pelo IP do computador (`http://IP-DO-PC:3000`), não por `localhost`. Para saber qual versão está rodando, abra `/api/health`. Passo a passo completo e roteiro de teste: [docs/producao-prism.md](docs/producao-prism.md).
 
+## Voz brasileira gratuita
+
+O branch de prévia inclui Piper para gerar agradecimentos em português no próprio servidor, sem API paga. [Ouça o exemplo](docs/piper-example.wav) e veja a [instalação e testes](docs/piper.md). No iPhone, toque em **Ativar voz**. A integração precisa ser validada no Render/PRISM antes de usar na live.
+
 ## Arquivos
 - `server.mjs`: Socket.IO, ciclo da batalha e recepção dos eventos TikTok
 - `version.mjs`: commit e impressão digital do código exibidos em `/api/health`

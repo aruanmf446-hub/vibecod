@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `1a1b9705b51e` |
+| Impressão digital do código | `3288e7f01c16` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -144,3 +144,8 @@ O pedido seguinte acrescentou um apresentador em PNG e balões de agradecimento/
 - Não configurar chave no HTML/JS público; somente variável do servidor. Sem chave, as frases locais funcionam e nenhuma API é chamada. A API real Groq não foi exercitada nesta etapa por falta de credencial: testes usaram respostas simuladas, incluindo falhas, saída inválida e limite de chamadas.
 
 Validação: 27 testes passaram, npm run check e node --check announcer.mjs passaram. QA de batalha completo passou; teste adicional com presentes reais do simulador conferiu Rosa → retrato azul/X-Men e Flor → amarelo/Vingadores, sem overflow ou exceções. Captura nova: visual-announcer.png. Para terminar a fala, escolher provedor TTS em português, configurar credencial somente no servidor e verificar desbloqueio/captura de áudio no iPhone/PRISM. Sem publicação no Render.
+
+
+### Atualização: Piper brasileiro preparado
+
+A pendência de voz externa da seção anterior foi implementada usando Piper local em CPU, sem API paga. Ver [docs/piper.md](piper.md), [ouvir exemplo](piper-example.wav) e [captura com voz](visual-piper.png). Botão Ativar voz separado dos efeitos; geração única por anúncio, cache e fila limitada. São 31 testes aprovados, QA completo do combate e teste real de WAV/reprodução no navegador. Docker construído e executado sem privilégios; os limites solicitados de CPU/memória não foram aplicados pelo ambiente de teste, portanto a viabilidade no Render Free ainda precisa ser confirmada no preview. O benchmark real do worker teve pico de 187,8 MB. Nada foi publicado ou alterado no Render.

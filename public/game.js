@@ -94,8 +94,33 @@
     document.addEventListener?.("visibilitychange", () => {
       if (document.hidden && context) { enabled = false; stop(); master.gain.value = 0; label(); }
     });
-    return { play };
+    return { play, duck(active) { if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0; } };
   })();
+  let voiceEnabled = false, voiceAudio = null;
+  const voiceButton = $("voiceToggle");
+  function stopVoice() {
+    voiceEnabled = false; voiceAudio?.pause(); sound.duck(false);
+    voiceButton.textContent = state?.narrationAvailable ? "Ativar voz" : "Voz não configurada";
+    voiceButton.setAttribute?.("aria-pressed", "false");
+  }
+  voiceButton.addEventListener("click", async () => {
+    if (voiceEnabled) { stopVoice(); return; }
+    if (!state?.narrationAvailable || !window.Audio) return;
+    try {
+      if (!voiceAudio) {
+        voiceAudio = new window.Audio(); voiceAudio.volume = .85;
+        voiceAudio.onplaying = () => sound.duck(true);
+        voiceAudio.onended = () => sound.duck(false);
+        voiceAudio.onerror = stopVoice;
+      }
+      // Unlock this exact media element with a real user gesture (required by iOS).
+      voiceAudio.src = "/assets/announcers/unlock.wav";
+      await voiceAudio.play();
+      voiceEnabled = true; voiceButton.textContent = "Silenciar voz";
+      voiceButton.setAttribute?.("aria-pressed", "true");
+    } catch { stopVoice(); }
+  });
+  document.addEventListener?.("visibilitychange", () => { if (document.hidden) stopVoice(); });
   function number(value) { return Math.round(Number(value) || 0).toLocaleString("pt-BR"); }
   function update(stateArg) {
     if (state && state.battleId === stateArg.battleId) {
@@ -104,6 +129,8 @@
     if (stateArg.winner && !state?.winner) victoryAt = performance.now();
     if (!stateArg.winner) victoryAt = 0;
     state = stateArg;
+    voiceButton.disabled = !state.narrationAvailable;
+    if (!voiceEnabled) voiceButton.textContent = state.narrationAvailable ? "Ativar voz" : "Voz não configurada";
     syncCombat(stateArg);
     $("yellowHpText").textContent = number(state.hp.yellow);
     $("blueHpText").textContent = number(state.hp.blue);
@@ -294,7 +321,12 @@
         $("announcerMessage").textContent = data.speech;
         $("announcerDetail").textContent = data.kind === "gift" ? "+" + data.count + " reforços · " + data.gift : "COMENTÁRIO DA LIVE";
         $("giftNotice").classList.toggle("blue", data.team === "blue");
-        giftUntil = now + 5000; nextAnnouncementAt = now + 5500;
+        const duration = voiceEnabled && data.audioUrl ? Math.max(5000, Math.min(30000, data.audioDuration * 1000 + 500)) : 5000;
+        giftUntil = now + duration; nextAnnouncementAt = now + duration + 500;
+        if (voiceEnabled && voiceAudio && /^\/api\/narration\/[a-f0-9-]{36}$/.test(data.audioUrl || "")) {
+          voiceAudio.src = data.audioUrl;
+          void voiceAudio.play().catch(stopVoice);
+        }
       }
     }
     $("giftNotice").hidden = now > giftUntil;

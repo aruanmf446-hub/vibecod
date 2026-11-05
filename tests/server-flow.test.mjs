@@ -7,12 +7,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Battle, COMBAT, reinforcementCount } from '../battle.mjs';
 import { createAnnouncer } from '../announcer.mjs';
+import { createPiperTts } from '../narration.mjs';
 function harness(env={}) {
   let now=10000, id=0;const timers=[],intervals=[],emissions=[],connections=[],routes={};
   const app={use(){},get(name,fn){routes[name]=fn},post(name,fn){routes[name]=fn}};
   const express=()=>app;express.json=()=>{};express.static=()=>{};
   class Live extends EventEmitter { constructor(){super();connections.push(this)}async connect(){} }
-  const sandbox={createAnnouncer,Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
+  const sandbox={createPiperTts,createAnnouncer,Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
     Server:class{on(){}emit(name,data){emissions.push({name,data})}},fileURLToPath,path,
     randomUUID:()=>String(++id),process:{env},console:{log(){},warn(){}},
     TikTokLiveConnection:Live,Date:class extends Date{constructor(...a){super(...(a.length?a:[now]))}static now(){return now}},performance:{now:()=>now},
