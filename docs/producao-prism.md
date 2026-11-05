@@ -156,3 +156,7 @@ A pendência de voz externa da seção anterior foi implementada usando Piper lo
 Em 05/11/2026, o usuário autorizou usar o principal, substituindo a restrição anterior de manter tudo apenas em preview. O serviço `batalha-torres` continua no plano Free, runtime Node e mesmo URL. A documentação atual do Render confirma Python disponível no runtime Node. Assim, `npm install` executa `scripts/setup-piper.mjs` via postinstall para criar `.piper/venv` e baixar a voz no build, sem exigir mudança de runtime ou outro serviço. No Render o Piper fica ativo por padrão; `PIPER_ENABLED=false` desliga instalação/voz. Configurações da live são preservadas.
 
 `GET /api/narration/sample` gera uma frase fixa, compartilhada e em cache por 4 minutos, sem aceitar texto e sem afetar unidades/pontos. O toque em Ativar voz reproduz essa amostra real para verificar o áudio, e mostra Preparando voz durante o carregamento. 32 testes passaram, instalação nativa e reprodução real do WAV foram verificadas localmente. A publicação deve ser confirmada pelo commit/fingerprint no /api/health e pela resposta WAV no endereço público; aprovação de merge não é confirmação de deploy.
+
+### Estado confirmado após publicação
+
+A versão com Piper já foi publicada no serviço principal e testada por HTTP/navegador. Relatório factual, métricas e pendências: [render-piper-live.md](render-piper-live.md). O plano continua Free. A produção não está mais limitada à versão antiga citada nos registros históricos acima.
