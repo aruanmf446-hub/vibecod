@@ -55,3 +55,5 @@ A conta configurada continuava desconectada e os contadores reais estavam zerado
 ## Atualização do diagnóstico da conexão
 
 A investigação posterior localizou o Business na consulta **opcional do catálogo de presentes** (`enableExtendedGiftInfo: true`), antes de abrir o WebSocket. A correção desliga essa consulta e o fallback pago de busca de sala. Nome/valor/tipo continuam vindo em `giftDetails` nos eventos nativos. O fluxo comunitário ainda utiliza EulerStream para o WebSocket, sujeito aos limites gratuitos. Não foi removida uma cobrança do serviço; o jogo deixou de pedir um recurso pago desnecessário. [Detalhes e validação](conexao-gratuita.md).
+
+O desbloqueio automático da voz agora ocorre no `click`, depois da ação do botão. Isso evita que esconder a faixa de voz entre pointerdown e pointerup desloque o botão e engula o primeiro toque em Testar sem live. O QA confere esse atalho antes da abertura por long-press.

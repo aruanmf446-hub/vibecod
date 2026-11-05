@@ -159,7 +159,9 @@
   });
   $('rehearsalVoice').addEventListener('click', () => voiceButton.click());
   $('unlockVoice').addEventListener('click', () => { voiceWanted = true; void enableVoice(); });
-  document.addEventListener?.('pointerdown', event => {
+  // Unlock after the target's click: hiding the voice banner during pointerdown
+  // can move the tapped control before pointerup, swallowing its click on phones.
+  document.addEventListener?.('click', event => {
     if (event.target === voiceButton || event.target === $('unlockVoice')) return;
     if (voiceWanted && !voiceEnabled && !voiceStarting) void enableVoice();
   });
