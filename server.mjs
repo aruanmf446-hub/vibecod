@@ -172,16 +172,20 @@ function strike(team, person, value, kind, gift = "") {
   io.emit("attack", { team, count, points, kind, gift, name: person.name });
   publish();
 }
+// Moedas de cada presente -> combatentes; num combo, cada presente conta (máx. 300 por evento).
+const GIFT_TIERS = [[1000, 80], [500, 50], [299, 35], [100, 20], [30, 10], [20, 8], [10, 5], [5, 3], [1, 1]];
+function giftFighters(diamonds) { return (GIFT_TIERS.find(([coins]) => diamonds >= coins) || [0, 1])[1]; }
 function receiveGift(raw) {
   if (raw?.giftType === 1 && raw.repeatEnd === false) return;
   const person = actor(raw);
   const name = giftName(raw);
   const team = teamFromGift(name) || teamFor(person.id);
   const diamonds = giftValue(raw);
-  announce({ kind: "gift", team, name: person.name, gift: name,
-    count: reinforcementCount(Math.max(8, Math.min(450, diamonds * 8)), "gift") });
-  // Uma flor/rosa invoca reforços; presentes maiores adicionam mais combatentes.
-  strike(team, person, Math.max(8, Math.min(450, diamonds * 8)), "gift", name);
+  const repeat = Math.max(1, Math.floor(Number(raw?.repeatCount) || 1));
+  const count = Math.min(300, giftFighters(Math.max(1, Math.round(diamonds / repeat))) * repeat);
+  announce({ kind: "gift", team, name: person.name, gift: name, count });
+  // Quanto mais moedas, mais combatentes (8 pontos por combatente).
+  strike(team, person, count * 8, "gift", name);
 }
 function receiveChat(raw) {
   const person = actor(raw);

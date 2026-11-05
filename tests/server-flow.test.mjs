@@ -158,3 +158,8 @@ test('tabela de presentes: cada presente vai para o time certo',()=>{
   for(const n of y){const h=harness({IDLE_SPAWN_SECONDS:'0'});h.receiveGift(gift(n));assert.equal(h.publicState().units.yellow,1,n);}
   for(const n of b){const h=harness({IDLE_SPAWN_SECONDS:'0'});h.receiveGift(gift(n));assert.equal(h.publicState().units.blue,1,n);}
 });
+test('faixas de moedas definem quantos combatentes saem',()=>{
+  for(const [coins,count] of [[1,1],[5,3],[10,5],[20,8],[30,10],[100,20],[299,35],[500,50],[1000,80]]){
+    const h=harness({IDLE_SPAWN_SECONDS:'0'});h.receiveGift({...gift('Galaxy'),diamondCount:coins});
+    assert.equal(h.publicState().units.yellow,count,String(coins));}
+});
