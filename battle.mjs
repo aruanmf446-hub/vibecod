@@ -25,6 +25,18 @@ export class Battle {
     this.queued[team] += count;
     this.fill();
   }
+  // Arena vazia: um guardião de cada lado no MESMO corredor. Com atributos iguais eles
+  // se encontram no meio e caem juntos, então nunca tiram HP das torres sozinhos.
+  skirmish(owner = { name: 'Guardião' }) {
+    if (this.units.length || this.queued.yellow || this.queued.blue) return false;
+    const lane = this.nextSkirmishLane = ((this.nextSkirmishLane ?? -1) + 1) % COMBAT.lanes.length;
+    for (const team of TEAMS) {
+      this.units.push({ id: this.nextId++, team, lane, x: team === 'yellow' ? COMBAT.yellowStart : COMBAT.blueStart,
+        y: COMBAT.lanes[lane], hp: COMBAT.hp, maxHp: COMBAT.hp, appearance: this.appearances[team]++ % ROSTER_SIZE[team],
+        owner: owner.name, guard: true, nextAttack: this.time, attackUntil: 0, hurtUntil: 0, action: 'move' });
+    }
+    return true;
+  }
   fill() {
     for (const team of TEAMS) {
       let active = this.units.filter(u => u.team === team).length;

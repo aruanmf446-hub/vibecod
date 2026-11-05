@@ -34,6 +34,10 @@ let lastSpokenComment = 0;
 let connectionError = '';
 const LIMIT = 1200;
 const AUTO_RESTART = process.env.AUTO_RESTART !== "false";
+// Arena vazia por IDLE_SPAWN_SECONDS: solta um guardião de cada lado (0 desliga).
+const IDLE_SPAWN_MS = Math.max(0, Number(process.env.IDLE_SPAWN_SECONDS ?? 6) || 0) * 1000;
+let idleMs = 0;
+const socialCooldown = new Map();
 const teamOf = new Map();
 const chatCooldown = new Map();
 const scores = { yellow: new Map(), blue: new Map() };
@@ -47,7 +51,7 @@ let match = freshMatch();
 let lastNews = "A batalha vai começar!";
 const build = buildInfo(root);
 // Contadores apenas de eventos vindos da LIVE real (o simulador local não conta aqui).
-const live = { gifts: 0, chats: 0, likes: 0, lastEventAt: null, lastGift: null, connectedAt: null };
+const live = { gifts: 0, chats: 0, likes: 0, follows: 0, shares: 0, lastEventAt: null, lastGift: null, connectedAt: null };
 function fromLive(kind, handler) {
   return raw => {
     live[kind] += 1; live.lastEventAt = new Date().toISOString();
@@ -119,6 +123,7 @@ function addPoints(team, person, amount) {
   table.set(person.id, previous);
 }
 function resetBattle() {
+  idleMs = 0;
   clearTimeout(restartTimer); restartTimer = null;
   const live = { connected: match.connected, viewers: match.viewers };
   const pending = pendingReinforcements; pendingReinforcements = [];
@@ -188,6 +193,21 @@ function receiveChat(raw) {
   chatCooldown.set(person.id, now);
   strike(team, person, 4, "chat");
 }
+// Seguir e compartilhar também viram reforço: 1 combatente para o time da pessoa.
+// Seguir vale uma vez por pessoa a cada batalha; compartilhar, uma vez por minuto.
+function receiveSocial(kind, raw) {
+  if (match.status !== "playing") return;
+  const person = actor(raw);
+  const key = kind + ":" + match.battleId + ":" + person.id;
+  const now = Date.now();
+  if (socialCooldown.has(key) && (kind === "follow" || now - socialCooldown.get(key) < 60000)) return;
+  socialCooldown.set(key, now);
+  if (socialCooldown.size > 5000) socialCooldown.clear();
+  const team = teamFor(person.id);
+  const label = kind === "follow" ? "o follow" : "o compartilhamento";
+  announce({ kind: "gift", team, name: person.name, gift: label, count: 1 });
+  strike(team, person, 4, kind, label);
+}
 function receiveLikes(raw) {
   const total = Number(raw?.totalLikeCount);
   let delta = Math.max(1, Number(raw?.likeCount) || 1);
@@ -250,6 +270,8 @@ app.post("/api/demo", (req, res) => {
   else if (action === "megaYellow") strike("yellow", person, 150, "gift", "Super presente");
   else if (action === "megaBlue") strike("blue", person, 150, "gift", "Super presente");
   else if (action === "likes") receiveLikes({ likeCount: 50 });
+  else if (action === "follow") receiveSocial("follow", { user: { uniqueId: person.id + Date.now(), nickname: person.name } });
+  else if (action === "share") receiveSocial("share", { user: { uniqueId: person.id + Date.now(), nickname: person.name } });
   else if (action === "reset") resetBattle();
   else return res.status(400).json({ error: "Ação desconhecida" });
   res.json({ ok: true });
@@ -267,6 +289,11 @@ setInterval(() => {
     if (match.status === "playing") {
       const result = battle.step(match.hp, Date.now() < match.powerUntil);
       if (result.winner) endRound(result.winner);
+      else if (IDLE_SPAWN_MS) {
+        const quiet = !battle.units.length && !battle.queued.yellow && !battle.queued.blue;
+        idleMs = quiet ? idleMs + COMBAT.stepMs : 0;
+        if (idleMs >= IDLE_SPAWN_MS && battle.skirmish()) idleMs = 0;
+      }
     }
   }
   publish();
@@ -282,6 +309,8 @@ async function connectLive() {
     connection.on("gift", fromLive("gifts", receiveGift));
     connection.on("chat", fromLive("chats", receiveChat));
     connection.on("like", fromLive("likes", receiveLikes));
+    connection.on("follow", fromLive("follows", raw => receiveSocial("follow", raw)));
+    connection.on("share", fromLive("shares", raw => receiveSocial("share", raw)));
     connection.on("roomUser", data => {
       match.viewers = Math.max(0, Number(data?.viewerCount || data?.totalUser || 0));
       publish();

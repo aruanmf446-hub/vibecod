@@ -12,7 +12,7 @@ export function announcementFor(input, index = 0) {
   const data = { kind: input.kind === 'comment' ? 'comment' : 'gift', team: input.team,
     name: cleanSpeech(input.name, 28) || 'Visitante', gift: cleanSpeech(input.gift, 60),
     message: cleanSpeech(input.message), count: Math.max(0, Math.floor(Number(input.count) || 0)) };
-  const label = { rose: 'pela rosa', rosa: 'pela rosa', flower: 'pela flor', flor: 'pela flor', 'ice cream cone': 'pelo sorvete', 'ice cream': 'pelo sorvete', sorvete: 'pelo sorvete', star: 'pela estrela', estrela: 'pela estrela' }[data.gift.toLowerCase()] || `pelo presente ${data.gift}`;
+  const label = { rose: 'pela rosa', rosa: 'pela rosa', flower: 'pela flor', flor: 'pela flor', 'ice cream cone': 'pelo sorvete', 'ice cream': 'pelo sorvete', sorvete: 'pelo sorvete', 'o follow': 'por seguir', 'o compartilhamento': 'por compartilhar', star: 'pela estrela', estrela: 'pela estrela' }[data.gift.toLowerCase()] || `pelo presente ${data.gift}`;
   return { ...data, phrase: cheers[data.team][index], speech: data.kind === 'gift'
     ? `Obrigado, ${data.name}, ${label}! ${cheers[data.team][index]}`
     : `${data.name} comentou: ${data.message}. ${cheers[data.team][index]}` };

@@ -135,3 +135,20 @@ test('Sorvete (Ice Cream Cone) invoca Vingadores e Rosa invoca X-Men',()=>{
   const h=harness();h.receiveGift(gift('Ice Cream Cone',3));h.receiveGift(gift('Rose',2));
   const state=h.publicState();assert.equal(state.units.yellow,3);assert.equal(state.units.blue,2);
 });
+test('arena vazia solta um de cada lado sem dar pontos; IDLE_SPAWN_SECONDS=0 desliga',()=>{
+  const h=harness();h.advance(5);assert.equal(h.publicState().combat.fighters.length,0);
+  h.advance(1.5);const f=h.publicState().combat.fighters;
+  assert.equal(f.filter(u=>u.team==='yellow').length,1);assert.equal(f.filter(u=>u.team==='blue').length,1);
+  assert.equal(JSON.stringify(h.publicState().points),'{"yellow":0,"blue":0}');
+  h.advance(600);const s=h.publicState();assert.equal(s.hp.yellow,1200);assert.equal(s.hp.blue,1200);assert.equal(s.status,'playing');
+  const off=harness({IDLE_SPAWN_SECONDS:'0'});off.advance(60);assert.equal(off.publicState().combat.fighters.length,0);
+});
+test('seguir e compartilhar invocam 1 combatente com limite por pessoa',async()=>{
+  const h=harness({TIKTOK_USERNAME:'canal',IDLE_SPAWN_SECONDS:'0'});await h.connectLive();
+  const fan={user:{uniqueId:'fan',nickname:'Fã'}};const c=h.connections[0];
+  c.emit('follow',fan);c.emit('follow',fan);c.emit('share',fan);c.emit('share',fan);
+  const s=h.publicState();assert.equal(s.units.yellow+s.units.blue,2);
+  const later=harness({TIKTOK_USERNAME:'canal',IDLE_SPAWN_SECONDS:'0'});await later.connectLive();
+  later.connections[0].emit('share',fan);later.advance(61);later.connections[0].emit('share',fan);
+  assert.equal(later.publicState().units.yellow+later.publicState().units.blue,2);
+});

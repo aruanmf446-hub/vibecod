@@ -17,6 +17,8 @@ Para conectar a LIVE, copie `.env.exemplo` para `.env`, preencha `TIKTOK_USERNAM
 - Outros presentes ajudam a equipe escolhida no chat (ou equipe atribuída ao usuário).
 - Curtidas alimentam a energia global; presentes invocam combatentes. Eles duelam e os sobreviventes atacam a torre adversária.
 - Sorvete/Rosa de 1 moeda invoca 1 combatente; presentes maiores invocam mais, até 57 por evento (limite de valor já existente). Até 12 por time ficam ativos; os demais aguardam espaço na fila.
+- Seguir a live ou compartilhar invoca 1 combatente para o time da pessoa (seguir: 1 vez por batalha; compartilhar: 1 vez por minuto).
+- Arena vazia por 6 segundos: sai 1 guardião de cada lado, no mesmo corredor. Eles se enfrentam no meio e caem juntos, sem tirar HP das torres nem dar pontos (`IDLE_SPAWN_SECONDS=0` desliga).
 - Batalhas sem limite de tempo e sem número de rodada. Vence quem destruir a torre; queda simultânea das duas torres é empate.
 - Reinício automático após 10 segundos. Presentes enviados nesse intervalo são guardados para a próxima batalha. Para reinício apenas manual, configure `AUTO_RESTART=false`.
 - Placar e ranking continuam contando o apoio recebido; o dano das torres acontece durante o combate, não na chegada do presente.
