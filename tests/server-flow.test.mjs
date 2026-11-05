@@ -12,17 +12,17 @@ function harness(env={}) {
   let now=10000, id=0;const timers=[],intervals=[],emissions=[],connections=[],routes={};
   const app={use(){},get(name,fn){routes[name]=fn},post(name,fn){routes[name]=fn}};
   const express=()=>app;express.json=()=>{};express.static=()=>{};
-  class Live extends EventEmitter { constructor(){super();connections.push(this)}async connect(){} }
+  class Live extends EventEmitter { constructor(username,options){super();this.username=username;this.options=options;connections.push(this)}async connect(){} }
   const sandbox={createPiperTts,createAnnouncer,announcementFor,Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
     Server:class{on(){}emit(name,data){emissions.push({name,data})}},fileURLToPath,path,
     randomUUID:()=>String(++id),process:{env},console:{log(){},warn(){}},
-    TikTokLiveConnection:Live,Date:class extends Date{constructor(...a){super(...(a.length?a:[now]))}static now(){return now}},performance:{now:()=>now},
+    TikTokLiveConnection:Live,RoomIdRouteConfig:{skipFetchRoomIdFromEulerRoute:false},Date:class extends Date{constructor(...a){super(...(a.length?a:[now]))}static now(){return now}},performance:{now:()=>now},
     setTimeout:(fn,delay)=>{const timer={fn,delay,cancelled:false};timers.push(timer);return timer},
     clearTimeout:timer=>{if(timer)timer.cancelled=true},setInterval:fn=>intervals.push(fn)};
   const source=readFileSync(new URL('../server.mjs',import.meta.url),'utf8')
     .replace(/^import .*;\n/gm,'').replaceAll('import.meta.url',JSON.stringify(import.meta.url));
   vm.runInNewContext(source+'\nglobalThis.api={receiveGift,receiveChat,receiveLikes,publicState,resetBattle,connectLive};',sandbox);
-  return {...sandbox.api,timers,emissions,connections,routes,advance(seconds){for(let i=0;i<seconds*10;i++){now+=100;intervals[0]()}}};
+  return {...sandbox.api,roomIdRoutes:sandbox.RoomIdRouteConfig,timers,emissions,connections,routes,advance(seconds){for(let i=0;i<seconds*10;i++){now+=100;intervals[0]()}}};
 }
 const gift=(name='Flower',repeat=1)=>({giftName:name,diamondCount:1,repeatCount:repeat,user:{uniqueId:'donor',nickname:'Doador'}});
 test('eventos reais de gift: combo é contado só no final e os times são respeitados',()=>{
@@ -179,4 +179,25 @@ test('faixas de moedas definem quantos combatentes saem',()=>{
   for(const [coins,count] of [[1,1],[5,3],[10,5],[20,8],[30,10],[100,20],[299,35],[500,50],[1000,80]]){
     const h=harness({IDLE_SPAWN_SECONDS:'0'});h.receiveGift({...gift('Galaxy'),diamondCount:coins});
     assert.equal(h.publicState().units.yellow,count,String(coins));}
+});
+
+
+test('conexão usa modo comunitário sem catálogo pago nem replay de eventos antigos',async()=>{
+ const h=harness({TIKTOK_USERNAME:'canal'});await h.connectLive();
+ assert.equal(h.connections[0].options.enableExtendedGiftInfo,false);
+ assert.equal(h.connections[0].options.processInitialData,false);
+ assert.equal(h.roomIdRoutes.skipFetchRoomIdFromEulerRoute,true);
+});
+test('presentes nativos 2.5.0 sem catálogo preservam times, moedas e combo só no final',async()=>{
+ const h=harness({TIKTOK_USERNAME:'canal',IDLE_SPAWN_SECONDS:'0'});await h.connectLive();
+ const c=h.connections[0],user={userId:'123',nickname:'Lucas'};
+ const rose={user,giftId:5655,repeatCount:3,repeatEnd:0,giftDetails:{giftName:'Rose',diamondCount:1,giftType:1}};
+ c.emit('gift',rose);assert.equal(h.publicState().units.blue,0);
+ c.emit('gift',{...rose,repeatEnd:1});assert.equal(h.publicState().units.blue,3);
+ assert.equal(h.publicState().points.blue,24);
+ c.emit('gift',{user,giftId:1234,repeatCount:2,repeatEnd:0,giftDetails:{giftName:'Ice Cream Cone',diamondCount:5,giftType:0}});
+ const s=h.publicState();assert.equal(s.units.yellow,6);assert.equal(s.points.yellow,48);
+ const notices=h.emissions.filter(e=>e.name==='announcement').map(e=>e.data);
+ assert.equal(notices.length,2);assert.match(notices[0].speech,/Lucas.*rosa.*X-Men/i);
+ assert.equal(notices[1].team,'yellow');assert.equal(notices[1].count,6);
 });
