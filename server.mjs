@@ -27,6 +27,7 @@ const announce = createAnnouncer({ emit: (event, data) => narration.publish(data
 const rehearsalFixtures = Object.freeze({
   rose: announcementFor({ team: 'blue', kind: 'gift', name: 'Lucas', gift: 'Rosa', count: 1 }),
   flower: announcementFor({ team: 'yellow', kind: 'gift', name: 'Lucas', gift: 'Flor', count: 1 }),
+  'star-yellow': announcementFor({ team: 'yellow', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
   star: announcementFor({ team: 'blue', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
   comment: announcementFor({ team: 'yellow', kind: 'comment', name: 'Maria', message: 'Vai, Vingadores! Vamos vencer essa batalha!' })
 });
@@ -302,7 +303,12 @@ async function connectLive() {
     publish();
   } catch (error) {
     match.connected = false;
-    connectionError = "Não foi possível conectar à live. Confira a conta e se a transmissão TikTok está pública e ativa.";
+    const reason = String(error?.message || error);
+    connectionError = /business plan/i.test(reason)
+      ? "O provedor da conexão exige plano Business. Os presentes não estão sendo recebidos; nenhum plano foi contratado."
+      : /isn't online|not live|offline/i.test(reason)
+        ? "A conta não está ao vivo no TikTok neste momento."
+        : "Não foi possível conectar à live. Confira a conta e se a transmissão TikTok está pública e ativa.";
     console.warn("LIVE indisponível: " + String(error?.message || error));
     publish();
     scheduleReconnect();

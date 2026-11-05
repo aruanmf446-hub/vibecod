@@ -125,9 +125,26 @@ test('eventos da conexão TikTok identificam doador, combo, time e agradecimento
  assert.equal(h.publicState().units.blue,3);
  const rose=h.emissions.filter(e=>e.name==='announcement'&&e.data.kind==='gift').at(-1).data;
  assert.equal(rose.name,'Lucas');assert.equal(rose.count,3);assert.match(rose.speech,/Lucas.*rosa.*X-Men/);
+ connection.emit('gift',{user,giftName:'Star',diamondCount:1,repeatCount:1});
+ const yellowStar=h.emissions.filter(e=>e.name==='announcement'&&e.data.kind==='gift').at(-1).data;assert.equal(yellowStar.team,'yellow');assert.match(yellowStar.speech,/estrela.*Vingadores/);
  connection.emit('chat',{user,comment:'2'});
  connection.emit('gift',{user,giftName:'Star',diamondCount:1,repeatCount:1});
  const star=h.emissions.filter(e=>e.name==='announcement'&&e.data.kind==='gift').at(-1).data;
  assert.equal(star.team,'blue');assert.match(star.speech,/Lucas.*estrela.*X-Men/);
  assert.equal(h.publicState().narrationComments,true);
+});
+
+test('ensaio oferece Estrela dos Vingadores e mantém Rosa/Flor nos times corretos',async()=>{
+ const h=harness({RENDER:'true',PIPER_ENABLED:'false'});
+ for(const [kind,team] of [['star-yellow','yellow'],['star','blue'],['flower','yellow'],['rose','blue']]){
+ let body;await h.routes['/api/rehearsal/:kind']({params:{kind}},{set(){},json:b=>body=b});
+ assert.equal(body.team,team);assert.match(body.speech,team==='yellow'?/Vingadores/:/X-Men/);
+ }
+ assert.equal(h.publicState().units.yellow,0);assert.equal(h.publicState().units.blue,0);
+});
+
+test('exigência de plano pago fica explícita, sem fingir conexão ou receber presentes',async()=>{
+ const h=harness({TIKTOK_USERNAME:'canal'});await h.connectLive();
+ h.connections[0].constructor.prototype.connect=async()=>{throw Error('This endpoint requires a Business plan.');};
+ await h.connectLive();assert.equal(h.publicState().connected,false);assert.match(h.publicState().connectionError,/exige plano Business/);
 });

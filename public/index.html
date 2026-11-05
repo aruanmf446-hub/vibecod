@@ -13,7 +13,7 @@
     <header class="top">
       <div class="topline"><span class="live-dot"></span><span id="liveStatus">MODO TESTE</span><span class="topline-right" id="viewerCount">⚡ BATALHA INTERATIVA</span></div>
       <div class="brandline"><span class="wingmark">✦</span><div><div class="eyebrow">TORRE DOS HERÓIS</div><h1><span>VINGADORES</span> <em>VS</em> <span>X-MEN</span></h1></div><span class="wingmark blue-glow">✧</span></div>
-      <div class="timerline"><span id="roundNo">0 × 0 EM CAMPO</span><strong id="clock">SEM LIMITE</strong><span id="energyFlag">LIVE FANMADE</span><button id="soundToggle" class="sound-toggle" type="button" aria-pressed="false" title="Ativar ou silenciar efeitos sonoros">Ativar som</button></div>
+      <div class="timerline"><span id="roundNo">0 × 0 EM CAMPO</span><strong id="clock">SEM LIMITE</strong><span id="energyFlag">LIVE FANMADE</span><button id="soundToggle" class="sound-toggle" type="button" aria-pressed="false" title="Ativar ou silenciar música e efeitos sonoros">Ativar som</button></div>
     </header>
     <div id="voiceUnlock" class="voice-unlock" hidden><button id="unlockVoice" type="button">Toque uma vez para liberar a voz no iPhone</button></div>
     <div id="rehearsalBanner" class="rehearsal-banner" hidden>ENSAIO · SOMENTE NESTE APARELHO · NÃO É DOAÇÃO REAL</div>
@@ -29,33 +29,34 @@
         <div class="teamfooter"><span>TIME AZUL</span><span id="bluePoints">0 PTS</span></div>
       </div>
     </section>
+      <div id="giftNotice" class="gift-notice announcer" role="status" hidden>
+        <img id="announcerPortrait" src="/assets/announcers/yellow.png" alt="" width="80" height="90">
+        <div class="speech-bubble"><strong id="announcerName"></strong><span id="announcerMessage"></span><small id="announcerDetail"></small></div>
+      </div>
     <div class="battle-area">
       <div class="arena-title"><span>◈ ARENA DOS CAMPEÕES ◈</span><span id="powerStatus">⚔️ BATALHA EM ANDAMENTO</span></div>
       <div id="combatQueue" class="combat-queue">Envie Flor ou Rosa para invocar combatentes</div>
       <canvas id="battle" width="540" height="650" role="img" aria-label="Arena animada com duas torres e pequenos super-heróis fanmade"></canvas>
       <div class="center-versus" aria-hidden="true">VS</div>
-      <div id="giftNotice" class="gift-notice announcer" role="status" hidden>
-        <img id="announcerPortrait" src="/assets/announcers/yellow.png" alt="" width="80" height="90">
-        <div class="speech-bubble"><strong id="announcerName"></strong><span id="announcerMessage"></span><small id="announcerDetail"></small></div>
-      </div>
       <div id="victoryCountdown" class="victory-countdown" hidden></div>
       <div id="winBanner" class="win-banner" hidden></div>
       <div id="toast" class="toast">Escolha seu time no chat e entre na batalha!</div>
     </div>
     <div class="power-strip"><div><b>⚡ ENERGIA DA LIVE</b><span id="energyText">0%</span></div><div class="power-track"><div id="energyFill"></div></div></div>
-    <div class="comment-controls"><button id="voiceToggle" class="sound-toggle" type="button" aria-pressed="false" disabled title="Ativar a voz brasileira do Piper">Voz não configurada</button><label class="comment-reading"><input id="readComments" type="checkbox" checked> Mostrar comentários</label></div>
+    <div class="comment-controls"><button id="voiceToggle" class="sound-toggle" type="button" aria-pressed="false" disabled title="Ativar a voz brasileira do Piper">Voz não configurada</button><label class="comment-reading"><input id="readComments" type="checkbox" checked> Mostrar comentários</label><button id="openRehearsal" class="sound-toggle" type="button">Testar sem live</button></div>
     <section class="instructions">
       <div class="guide yellow-guide"><div class="gift">🌼</div><div><strong>FLOR = VINGADORES</strong><small>Digite 1 para entrar no time amarelo</small></div></div>
       <div class="guide blue-guide"><div class="gift">🌹</div><div><strong>ROSA = X-MEN</strong><small>Digite 2 para entrar no time azul</small></div></div>
     </section>
     <section class="ranking"><div class="ranking-col"><h2>🏆 TOP VINGADORES</h2><ol id="yellowRank"><li>Aguardando heróis...</li></ol></div><div class="ranking-col"><h2>🏆 TOP X-MEN</h2><ol id="blueRank"><li>Aguardando mutantes...</li></ol></div></section>
     <section id="demoPanel" class="demo" hidden><div class="demo-heading">🧪 SIMULADOR LOCAL <small>Teste sem estar ao vivo</small></div><div class="demo-buttons"><button data-action="flower">🌼 Flor</button><button data-action="rose">🌹 Rosa</button><button data-action="megaYellow">⚡ Reforço amarelo</button><button data-action="megaBlue">💠 Reforço azul</button><button data-action="likes">👍 50 curtidas</button><button data-action="reset">↻ Reiniciar</button></div></section>
+    <button id="showRehearsalControls" class="rehearsal-launcher" type="button" hidden>Abrir testes</button>
     <section id="rehearsalPanel" class="rehearsal-panel" hidden>
-      <div class="rehearsal-heading"><strong>TESTAR ANTES DA LIVE</strong><button id="rehearsalVoice" type="button">Liberar voz</button><a id="exitRehearsal" href="/">Sair</a></div>
+      <div class="rehearsal-heading"><strong>PAINEL DE TESTES</strong><button id="hideRehearsalControls" type="button">Fechar</button><button id="rehearsalVoice" type="button">Liberar voz</button><a id="exitRehearsal" href="/">Sair</a></div>
       <p>Estes testes só alteram este aparelho. Segure o título por 2 segundos para abrir este modo.</p>
       <div class="demo-buttons">
-        <button data-rehearsal="rose">Rosa · Lucas</button><button data-rehearsal="flower">Flor · Lucas</button><button data-rehearsal="star">Estrela · Júnior</button>
-        <button data-rehearsal="comment">Comentário · Maria</button><button data-rehearsal="yellow">Reforço amarelo</button><button data-rehearsal="blue">Reforço azul</button>
+        <button data-rehearsal="rose">Rosa · Lucas</button><button data-rehearsal="flower">Flor · Lucas</button><button data-rehearsal="star">Estrela · X-Men</button><button data-rehearsal="star-yellow">Estrela · Vingadores</button>
+        <button data-rehearsal="comment">Comentário · Maria</button><button data-rehearsal="yellow">Reforço Vingadores</button><button data-rehearsal="blue">Reforço X-Men</button>
         <button data-rehearsal="likes">Curtidas</button><button data-rehearsal="victory">Testar vitória</button><button data-rehearsal="reset">Limpar ensaio</button>
       </div>
       <p id="rehearsalResult" role="status">Pronto para testar.</p>
