@@ -85,3 +85,11 @@ test('doações ainda conseguem defender quando as três entradas estão sob ata
   assert.equal(hp.yellow,1200);
   assert.ok(battle.units.every(u=>u.hp<COMBAT.hp));
 });
+test('guardiões da arena vazia saem no mesmo corredor, caem juntos e não tocam nas torres', () => {
+  const b = new Battle(); const hp = { yellow: 1200, blue: 1200 };
+  assert.equal(b.skirmish(), true); assert.equal(b.skirmish(), false);
+  const [y, z] = b.units; assert.equal(y.lane, z.lane); assert.notEqual(y.team, z.team);
+  for (let i = 0; i < 400 && b.units.length; i++) b.step(hp);
+  assert.equal(b.units.length, 0); assert.deepEqual(hp, { yellow: 1200, blue: 1200 });
+  b.summon('yellow', 1, { name: 'Ana' }); assert.equal(b.skirmish(), false);
+});

@@ -26,7 +26,7 @@ const announce = createAnnouncer({ emit: (event, data) => narration.publish(data
   apiKey: process.env.GROQ_API_KEY || "", model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile" });
 const rehearsalFixtures = Object.freeze({
   rose: announcementFor({ team: 'blue', kind: 'gift', name: 'Lucas', gift: 'Rosa', count: 1 }),
-  flower: announcementFor({ team: 'yellow', kind: 'gift', name: 'Lucas', gift: 'Flor', count: 1 }),
+  flower: announcementFor({ team: 'yellow', kind: 'gift', name: 'Lucas', gift: 'Sorvete', count: 1 }),
   'star-yellow': announcementFor({ team: 'yellow', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
   star: announcementFor({ team: 'blue', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
   comment: announcementFor({ team: 'yellow', kind: 'comment', name: 'Maria', message: 'Vai, Vingadores! Vamos vencer essa batalha!' })
@@ -35,6 +35,10 @@ let lastSpokenComment = 0;
 let connectionError = '';
 const LIMIT = 1200;
 const AUTO_RESTART = process.env.AUTO_RESTART !== "false";
+// Arena vazia por IDLE_SPAWN_SECONDS: solta um guardião de cada lado (0 desliga).
+const IDLE_SPAWN_MS = Math.max(0, Number(process.env.IDLE_SPAWN_SECONDS ?? 6) || 0) * 1000;
+let idleMs = 0;
+const socialCooldown = new Map();
 const teamOf = new Map();
 const chatCooldown = new Map();
 const scores = { yellow: new Map(), blue: new Map() };
@@ -48,7 +52,7 @@ let match = freshMatch();
 let lastNews = "A batalha vai começar!";
 const build = buildInfo(root);
 // Contadores apenas de eventos vindos da LIVE real (o simulador local não conta aqui).
-const live = { gifts: 0, chats: 0, likes: 0, lastEventAt: null, lastGift: null, connectedAt: null };
+const live = { gifts: 0, chats: 0, likes: 0, follows: 0, shares: 0, lastEventAt: null, lastGift: null, connectedAt: null };
 function fromLive(kind, handler) {
   return raw => {
     live[kind] += 1; live.lastEventAt = new Date().toISOString();
@@ -95,11 +99,17 @@ function teamFromChat(message) {
   if (["2", "azul", "blue", "xmen", "mutantes", "mutants"].includes(word)) return "blue";
   return null;
 }
+// Tabela de presentes por time (nomes do TikTok, comparados sem acento/espaço/maiúscula).
+const GIFT_TEAMS = {
+  yellow: ["Ice Cream Cone", "Sorvete", "Wave Firework", "Courage Potion", "Rage Mode", "Energy Capsule",
+    "Power Chip", "Boxing Gloves", "Money Gun", "Galaxy", "Flower", "Flor", "Sunflower", "Girassol"],
+  blue: ["Rose", "Rosa", "Finger Heart", "Magic Feather", "Mushroom", "Ghostfire", "Danger Door",
+    "Butterfly for You", "Gem Gun", "Magic Potion"]
+};
+const giftKey = value => String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const GIFT_TEAM = new Map(Object.entries(GIFT_TEAMS).flatMap(([team, names]) => names.map(n => [giftKey(n), team])));
 function teamFromGift(name) {
-  const word = String(name || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-  if (/\brose\b|\brosa\b/.test(word)) return "blue";
-  if (/\bflower\b|\bflor\b|\bsunflower\b|\bdaisy\b|\btulip\b|\bgirassol\b/.test(word)) return "yellow";
-  return null;
+  return GIFT_TEAM.get(giftKey(name)) || null;
 }
 function giftName(raw) {
   return String(raw?.giftName || raw?.extendedGiftInfo?.name || raw?.giftDetails?.giftName ||
@@ -119,13 +129,14 @@ function addPoints(team, person, amount) {
   table.set(person.id, previous);
 }
 function resetBattle() {
+  idleMs = 0;
   clearTimeout(restartTimer); restartTimer = null;
   const live = { connected: match.connected, viewers: match.viewers };
   const pending = pendingReinforcements; pendingReinforcements = [];
   scores.yellow.clear(); scores.blue.clear();
   battle = new Battle();
   match = { ...freshMatch(), ...live };
-  lastNews = "Nova batalha! Envie Flor ou Rosa para invocar combatentes.";
+  lastNews = "Nova batalha! Envie Sorvete ou Rosa para invocar combatentes.";
   io.emit("reset", { battleId: match.battleId });
   for (const r of pending) strike(r.team, r.person, r.value, r.kind, r.gift);
   publish();
@@ -162,16 +173,20 @@ function strike(team, person, value, kind, gift = "") {
   io.emit("attack", { team, count, points, kind, gift, name: person.name });
   publish();
 }
+// Moedas de cada presente -> combatentes; num combo, cada presente conta (máx. 300 por evento).
+const GIFT_TIERS = [[1000, 80], [500, 50], [299, 35], [100, 20], [30, 10], [20, 8], [10, 5], [5, 3], [1, 1]];
+function giftFighters(diamonds) { return (GIFT_TIERS.find(([coins]) => diamonds >= coins) || [0, 1])[1]; }
 function receiveGift(raw) {
   if (raw?.giftType === 1 && raw.repeatEnd === false) return;
   const person = actor(raw);
   const name = giftName(raw);
   const team = teamFromGift(name) || teamFor(person.id);
   const diamonds = giftValue(raw);
-  announce({ kind: "gift", team, name: person.name, gift: name,
-    count: reinforcementCount(Math.max(8, Math.min(450, diamonds * 8)), "gift") });
-  // Uma flor/rosa invoca reforços; presentes maiores adicionam mais combatentes.
-  strike(team, person, Math.max(8, Math.min(450, diamonds * 8)), "gift", name);
+  const repeat = Math.max(1, Math.floor(Number(raw?.repeatCount) || 1));
+  const count = Math.min(300, giftFighters(Math.max(1, Math.round(diamonds / repeat))) * repeat);
+  announce({ kind: "gift", team, name: person.name, gift: name, count });
+  // Quanto mais moedas, mais combatentes (8 pontos por combatente).
+  strike(team, person, count * 8, "gift", name);
 }
 function receiveChat(raw) {
   const person = actor(raw);
@@ -187,6 +202,21 @@ function receiveChat(raw) {
   if (now - (chatCooldown.get(person.id) || 0) < 1800) return;
   chatCooldown.set(person.id, now);
   strike(team, person, 4, "chat");
+}
+// Seguir e compartilhar também viram reforço: 1 combatente para o time da pessoa.
+// Seguir vale uma vez por pessoa a cada batalha; compartilhar, uma vez por minuto.
+function receiveSocial(kind, raw) {
+  if (match.status !== "playing") return;
+  const person = actor(raw);
+  const key = kind + ":" + match.battleId + ":" + person.id;
+  const now = Date.now();
+  if (socialCooldown.has(key) && (kind === "follow" || now - socialCooldown.get(key) < 60000)) return;
+  socialCooldown.set(key, now);
+  if (socialCooldown.size > 5000) socialCooldown.clear();
+  const team = teamFor(person.id);
+  const label = kind === "follow" ? "o follow" : "o compartilhamento";
+  announce({ kind: "gift", team, name: person.name, gift: label, count: 1 });
+  strike(team, person, 4, kind, label);
 }
 function receiveLikes(raw) {
   const total = Number(raw?.totalLikeCount);
@@ -245,11 +275,13 @@ app.post("/api/demo", (req, res) => {
   if (!isLocal(req)) return res.status(403).json({ error: "Simulação disponível apenas em localhost." });
   const action = String(req.body?.action || "");
   const person = { id: "demo-" + action, name: "Teste local" };
-  if (action === "flower") receiveGift({ user: { uniqueId: person.id, nickname: person.name }, giftName: "Flower", diamondCount: 1, repeatCount: 1 });
+  if (action === "flower") receiveGift({ user: { uniqueId: person.id, nickname: person.name }, giftName: "Ice Cream Cone", diamondCount: 1, repeatCount: 1 });
   else if (action === "rose") receiveGift({ user: { uniqueId: person.id, nickname: person.name }, giftName: "Rose", diamondCount: 1, repeatCount: 1 });
   else if (action === "megaYellow") strike("yellow", person, 150, "gift", "Super presente");
   else if (action === "megaBlue") strike("blue", person, 150, "gift", "Super presente");
   else if (action === "likes") receiveLikes({ likeCount: 50 });
+  else if (action === "follow") receiveSocial("follow", { user: { uniqueId: person.id + Date.now(), nickname: person.name } });
+  else if (action === "share") receiveSocial("share", { user: { uniqueId: person.id + Date.now(), nickname: person.name } });
   else if (action === "reset") resetBattle();
   else return res.status(400).json({ error: "Ação desconhecida" });
   res.json({ ok: true });
@@ -267,6 +299,11 @@ setInterval(() => {
     if (match.status === "playing") {
       const result = battle.step(match.hp, Date.now() < match.powerUntil);
       if (result.winner) endRound(result.winner);
+      else if (IDLE_SPAWN_MS) {
+        const quiet = !battle.units.length && !battle.queued.yellow && !battle.queued.blue;
+        idleMs = quiet ? idleMs + COMBAT.stepMs : 0;
+        if (idleMs >= IDLE_SPAWN_MS && battle.skirmish()) idleMs = 0;
+      }
     }
   }
   publish();
@@ -282,6 +319,8 @@ async function connectLive() {
     connection.on("gift", fromLive("gifts", receiveGift));
     connection.on("chat", fromLive("chats", receiveChat));
     connection.on("like", fromLive("likes", receiveLikes));
+    connection.on("follow", fromLive("follows", raw => receiveSocial("follow", raw)));
+    connection.on("share", fromLive("shares", raw => receiveSocial("share", raw)));
     connection.on("roomUser", data => {
       match.viewers = Math.max(0, Number(data?.viewerCount || data?.totalUser || 0));
       publish();

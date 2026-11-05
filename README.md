@@ -11,12 +11,15 @@ Jogo de batalha de torres **não oficial**, criado para lives interativas no Tik
 Para conectar a LIVE, copie `.env.exemplo` para `.env`, preencha `TIKTOK_USERNAME` **sem @**, salve e reinicie o servidor. O perfil deve estar ao vivo.
 
 ## Regras
-- 🌼 **Flor/Flower** = equipe amarela **Vingadores**.
+- 🍦 **Sorvete (Ice Cream Cone)** = equipe amarela **Vingadores**. O TikTok não tem presente "Flor"; o nome Flower continua aceito, caso volte a existir.
 - 🌹 **Rosa/Rose** = equipe azul **X-Men**.
 - Chat `1` / `vingadores` = amarelo; `2` / `xmen` = azul.
+- Tabela de presentes: Vingadores = Sorvete, Wave Firework, Courage Potion, Rage Mode, Energy Capsule, Power Chip, Boxing Gloves, Money Gun, Galaxy. X-Men = Rosa, Finger Heart, Magic Feather, Mushroom, Ghostfire, Danger Door, Butterfly for You, Gem Gun, Magic Potion (lista em `GIFT_TEAMS`, no `server.mjs`).
 - Outros presentes ajudam a equipe escolhida no chat (ou equipe atribuída ao usuário).
 - Curtidas alimentam a energia global; presentes invocam combatentes. Eles duelam e os sobreviventes atacam a torre adversária.
-- Flor/Rosa de 1 diamante invoca 1 combatente; presentes maiores invocam mais, até 57 por evento (limite de valor já existente). Até 12 por time ficam ativos; os demais aguardam espaço na fila.
+- Combatentes por presente: 1 moeda = 1, 5 = 3, 10 = 5, 20 = 8, 30 = 10, 100 = 20, 299 = 35, 500 = 50, 1.000 = 80 (combo: cada presente conta; máx. 300 por evento). Até 12 por time ficam ativos; os demais aguardam espaço na fila.
+- Seguir a live ou compartilhar invoca 1 combatente para o time da pessoa (seguir: 1 vez por batalha; compartilhar: 1 vez por minuto).
+- Arena vazia por 6 segundos: sai 1 guardião de cada lado, no mesmo corredor. Eles se enfrentam no meio e caem juntos, sem tirar HP das torres nem dar pontos (`IDLE_SPAWN_SECONDS=0` desliga).
 - Batalhas sem limite de tempo e sem número de rodada. Vence quem destruir a torre; queda simultânea das duas torres é empate.
 - Reinício automático após 10 segundos. Presentes enviados nesse intervalo são guardados para a próxima batalha. Para reinício apenas manual, configure `AUTO_RESTART=false`.
 - Placar e ranking continuam contando o apoio recebido; o dano das torres acontece durante o combate, não na chegada do presente.
@@ -27,7 +30,7 @@ O iPhone precisa abrir o jogo pelo IP do computador (`http://IP-DO-PC:3000`), n�
 
 ## Testar pelo iPhone antes da live
 
-Abra https://batalha-torres.onrender.com/#teste. Botões de Rosa, Flor, Estrela, comentários e batalha funcionam só no ensaio deste aparelho. Voz e comentários habilitados por padrão; se o iPhone bloquear áudio, basta um toque. [Passo a passo e limites da validação](docs/teste-iphone.md).
+Abra https://batalha-torres.onrender.com/#teste. Botões de Rosa, Sorvete, Estrela, comentários e batalha funcionam só no ensaio deste aparelho. Voz e comentários habilitados por padrão; se o iPhone bloquear áudio, basta um toque. [Passo a passo e limites da validação](docs/teste-iphone.md).
 
 ## Voz brasileira gratuita
 

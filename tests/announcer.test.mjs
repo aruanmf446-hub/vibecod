@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAnnouncer, cleanSpeech } from '../announcer.mjs';
+import { createAnnouncer, cleanSpeech, announcementFor } from '../announcer.mjs';
 const gift = { kind:'gift',team:'blue',name:'Lucas',gift:'Rosa',count:1 };
 test('agradecimentos funcionam sem chave e respeitam o time',()=>{
  const events=[];const announce=createAnnouncer({emit:(event,data)=>events.push({event,data})});
@@ -35,4 +35,8 @@ test('quantidade de espectadores não cria pedidos e rajadas limitam chamadas Gr
  const announce=createAnnouncer({apiKey:'test',now:()=>10000,emit:(_,d)=>events.push(d),fetcher:async()=>{requests++;return {ok:false}}});
  for(let i=0;i<30;i++)announce(gift);
  await new Promise(resolve=>setImmediate(resolve));assert.equal(requests,1);assert.equal(events.length,30);
+});
+test('agradecimento do Sorvete fala "pelo sorvete"', () => {
+  const data = announcementFor({ team: 'yellow', kind: 'gift', name: 'Ana', gift: 'Ice Cream Cone', count: 1 });
+  assert.match(data.speech, /^Obrigado, Ana, pelo sorvete!/);
 });
