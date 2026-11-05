@@ -11,11 +11,11 @@ export function announcementFor(input, index = 0) {
   if (!Number.isInteger(index) || index < 0 || index > 2) index = 0;
   const data = { kind: input.kind === 'comment' ? 'comment' : 'gift', team: input.team,
     name: cleanSpeech(input.name, 28) || 'Visitante', gift: cleanSpeech(input.gift, 60),
-    message: cleanSpeech(input.message), count: Math.max(0, Math.floor(Number(input.count) || 0)) };
+    message: cleanSpeech(input.message), teamSelection: input.teamSelection === true, count: Math.max(0, Math.floor(Number(input.count) || 0)) };
   const label = { rose: 'pela rosa', rosa: 'pela rosa', flower: 'pela flor', flor: 'pela flor', 'ice cream cone': 'pelo sorvete', 'ice cream': 'pelo sorvete', sorvete: 'pelo sorvete', 'o follow': 'por seguir', 'o compartilhamento': 'por compartilhar', star: 'pela estrela', estrela: 'pela estrela' }[data.gift.toLowerCase()] || `pelo presente ${data.gift}`;
   return { ...data, phrase: cheers[data.team][index], speech: data.kind === 'gift'
     ? `Obrigado, ${data.name}, ${label}! ${cheers[data.team][index]}`
-    : `${data.name} comentou: ${data.message}. ${cheers[data.team][index]}` };
+    : `${data.name} comentou: ${data.message}${data.teamSelection ? `. Entrou para ${data.team === 'blue' ? 'os X-Men' : 'os Vingadores'}!` : ''}` };
 }
 export function createAnnouncer({ emit, apiKey = '', model = 'llama-3.3-70b-versatile', fetcher = globalThis.fetch, now = Date.now }) {
   let busy = false, nextRequest = 0;

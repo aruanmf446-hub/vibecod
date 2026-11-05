@@ -10,10 +10,10 @@ A conclusão anterior de que toda conexão necessariamente exigia Business era i
 
 ## Correção
 
-- `enableExtendedGiftInfo: false`: não consulta o catálogo opcional pago. O próprio evento `WebcastGiftMessage` traz `giftDetails.giftName`, `diamondCount` e `giftType`; `repeatCount` e `repeatEnd` estão no evento.
+- `enableExtendedGiftInfo: false`: não consulta o catálogo opcional pago. No schema v3 efetivamente usado pela biblioteca, o evento traz `gift.name`, `gift.diamondCount` e `gift.type`; `repeatCount` e `repeatEnd` estão no evento. O formato anterior `giftDetails` também é aceito.
 - `RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute = true`: consulta sala por HTML/API do TikTok, sem recorrer à busca gerenciada paga se ambas falharem. Se falharem, a conexão informa falha em vez de fingir sucesso.
 - `processInitialData: false`: não transforma o lote de histórico da conexão/reconexão em novas doações para a batalha.
-- Combo nativo: `giftDetails.giftType === 1` e `repeatEnd` numérico `0/1` são respeitados. Apenas o final entra no motor; formato antigo booleano continua aceito.
+- Combo nativo: `gift.type === 1` (ou `giftDetails.giftType` no formato anterior) e `repeatEnd` numérico `0/1` são respeitados. Apenas o final entra no motor; formato antigo booleano continua aceito.
 - Regras, tabela de presentes, faixas de moedas, HP, times, duelos e voz permanecem como estavam. Não há dependência nova, cadastro automático, chave ou cobrança.
 
 EulerStream continua como provedor do handshake WebSocket comunitário. Isto não elimina dependência externa nem concede acesso a serviços pagos. O fornecedor anuncia Community gratuito com limites; uma chave gratuita poderá ser necessária se os limites anônimos ou as políticas do fornecedor mudarem. Não foi criada conta nem usado cartão.
@@ -32,4 +32,6 @@ EulerStream continua como provedor do handshake WebSocket comunitário. Isto nã
 - [Documentação oficial: configuração e eventos](https://github.com/zerodytrash/TikTok-Live-Connector).
 - [EulerStream: Community e rotas Business](https://www.eulerstream.com/pricing).
 
-A publicação só deve ser considerada concluída após deploy `live` e fingerprint `3853b5873bff` no `/api/health`. Estar publicado não comprova `connected: true` nem recebimento de presente real.
+A publicação só deve ser considerada concluída após deploy `live` e fingerprint `1dbaef83e63c` no `/api/health`. Estar publicado não comprova `connected: true` nem recebimento de presente real.
+
+A investigação dos comentários confirmou que os exemplos anteriores do README da biblioteca usavam campos antigos. Os testes agora usam o schema v3 instalado e um lockfile fixa as dependências: [correção de comentários e áudio](correcoes-comentarios-audio.md).

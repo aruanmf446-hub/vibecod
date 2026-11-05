@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `3853b5873bff` |
+| Impressão digital do código | `1dbaef83e63c` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 

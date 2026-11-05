@@ -29,7 +29,8 @@ const assert = require('node:assert/strict');
     await page.goto(base + (remote ? '/#teste' : '')); await page.waitForTimeout(500);
     assert.equal(await page.evaluate(() => qaMusic.starts), 0);
     assert.equal(loads.length, 0, 'a música não baixa antes do primeiro gesto');
-    await page.locator('#musicToggle').click();
+    if (await page.locator('#rehearsalPanel').isVisible()) await page.locator('#hideRehearsalControls').click();
+    else await page.locator('#musicToggle').click();
     await page.waitForFunction(() => document.querySelector('#musicToggle').getAttribute('aria-pressed') === 'true');
     await page.waitForTimeout(600);
     assert.ok(await page.evaluate(() => {
