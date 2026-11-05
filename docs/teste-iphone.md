@@ -47,8 +47,8 @@ A conta configurada continuava desconectada e os contadores reais estavam zerado
 ## Correções de áudio e testes em 05/11/2026
 
 - O painel fecha depois de enviar um presente de teste para não encobrir a imagem. Use **Abrir testes** para escolher outro. O retrato inteiro aparece numa faixa própria acima da arena, fora do canvas.
-- **Ativar som** inicia efeitos e uma trilha instrumental original, leve, sintetizada localmente. **Silenciar som** interrompe ambos. A música reduz de volume enquanto a voz fala e para ao ocultar a página. Não há download de música nem serviço pago.
-- No print enviado, o PRISM estava com **Áudio do App** no mínimo. Aumentar esse volume e tocar **Ativar som** no jogo. Testar primeiro no Safari; a captura de áudio no PRISM/iPhone ainda precisa de confirmação física.
+- **Ativar efeitos** controla os sons de combate. A música tem botão próprio **♫ Ativar música / Música ligada**, separado da voz. A música reduz de volume enquanto a voz fala e para ao ocultar a página. Não há download de música nem serviço pago.
+- No print enviado, o PRISM estava com **Áudio do App** no mínimo. Aumentar esse volume e tocar **♫ Ativar música** no jogo. Testar primeiro no Safari; a captura de áudio no PRISM/iPhone ainda precisa de confirmação física.
 - Bloqueio real identificado nos logs do Render: `fetchWebcastSignatureFromEulerRoute` respondeu **This endpoint requires a Business plan** enquanto tentava conectar. Nenhum plano foi contratado. Em outras tentativas a conta já estava offline. A interface agora informa a exigência de plano quando recebe esse erro. Piper continua gratuito, mas o provedor atual de assinatura impede confirmar presentes reais gratuitamente. PRISM não encaminha presentes ao jogo: a biblioteca no servidor precisa estar conectada ao TikTok.
 - Validação local: 46 testes, check de sintaxe, presentes isolados nos dois times, reprodução Piper, música liga/desliga, retrato sem corte e sem overflow em 360×640, 390×844, 720×1280 e 1080×1920. Ensaio não altera a batalha pública.
 
@@ -57,3 +57,9 @@ A conta configurada continuava desconectada e os contadores reais estavam zerado
 A investigação posterior localizou o Business na consulta **opcional do catálogo de presentes** (`enableExtendedGiftInfo: true`), antes de abrir o WebSocket. A correção desliga essa consulta e o fallback pago de busca de sala. Nome/valor/tipo continuam vindo em `giftDetails` nos eventos nativos. O fluxo comunitário ainda utiliza EulerStream para o WebSocket, sujeito aos limites gratuitos. Não foi removida uma cobrança do serviço; o jogo deixou de pedir um recurso pago desnecessário. [Detalhes e validação](conexao-gratuita.md).
 
 O desbloqueio automático da voz agora ocorre no `click`, depois da ação do botão. Isso evita que esconder a faixa de voz entre pointerdown e pointerup desloque o botão e engula o primeiro toque em Testar sem live. O QA confere esse atalho antes da abertura por long-press.
+
+## Nova música de fundo
+
+Trilha instrumental original local de 34 segundos em loop, cerca de 400 KB. Começa no primeiro toque em qualquer controle, respeitando o bloqueio de autoplay do iPhone. **♫ Música ligada** desliga só a música; **♫ Ativar música** volta a ligar. Efeitos e voz têm controles separados. O volume da trilha cai durante os agradecimentos e volta suavemente ao terminar. Ao ocultar a página, a trilha para; tenta voltar quando a página reaparece. Se o iOS bloquear, tocar novamente no botão de música.
+
+No PRISM, manter **Áudio do App** acima de zero. Não precisa ativar microfone para capturar o áudio do jogo. A confirmação de captura no iPhone físico segue pendente. [Ouvir o MP3 original](../public/assets/audio/arena-theme.mp3).

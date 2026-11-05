@@ -36,7 +36,10 @@
   const colors = { yellow: ["#ffb323", "#ffe084", "#c57322"], blue: ["#256cdb", "#90ddff", "#154a9f"] };
   // Small original Web Audio cues. Nothing starts before an explicit tap.
   const sound = (() => {
-    let context = null, master = null, enabled = false, musicTimer = null, musicStep = 0, ducked = false;
+    let context = null, master = null, enabled = false, ducked = false;
+    let musicGain = null, musicBuffer = null, musicSource = null, musicLoad = null;
+    let musicWanted = true, musicBusy = false;
+    const musicButton = $("musicToggle");
     const voices = new Set(), last = Object.create(null);
     const button = $("soundToggle");
     const cues = {
@@ -51,11 +54,10 @@
     };
     function label() {
       const running = enabled && context?.state === "running";
-      button.textContent = running ? "Silenciar som" : "Ativar som";
+      button.textContent = running ? "Silenciar efeitos" : "Ativar efeitos";
       button.setAttribute?.("aria-pressed", String(Boolean(running)));
     }
     function stop() {
-      clearInterval(musicTimer); musicTimer = null;
       for (const oscillator of voices) { try { oscillator.stop(); } catch {} }
       voices.clear();
     }
@@ -63,40 +65,67 @@
       const Audio = window.AudioContext || window.webkitAudioContext;
       if (!Audio) { button.textContent = "Áudio indisponível"; button.disabled = true; return; }
       try {
-        if (!context) {
-          context = new Audio(); master = context.createGain();
-          master.gain.value = .3; master.connect(context.destination);
-          context.onstatechange = label;
-        }
+        ensureContext();
         if (enabled && context.state === "running") {
           enabled = false; stop(); master.gain.value = 0;
         } else {
           await context.resume(); enabled = context.state === "running";
           master.gain.value = enabled ? (ducked ? .08 : .3) : 0;
-          if (enabled) { play("reset"); startMusic(); }
+          if (enabled) play("reset");
         }
         label();
       } catch { enabled = false; label(); }
     }
-    // Original quiet fantasy arpeggio, two short notes per second; no downloads.
-    function startMusic() {
-      if (musicTimer) return;
-      const melody = [57, 64, 69, 72, 59, 66, 71, 74, 55, 62, 67, 71, 60, 64, 67, 72];
-      const tick = () => {
-        if (!enabled || context.state !== "running" || document.hidden || voices.size >= 10) return;
-        const start = context.currentTime, end = start + .85;
-        const oscillator = context.createOscillator(), envelope = context.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = 440 * 2 ** ((melody[musicStep++ % melody.length] - 69) / 12);
-        envelope.gain.setValueAtTime(0, start);
-        envelope.gain.linearRampToValueAtTime(.06, start + .045);
-        envelope.gain.exponentialRampToValueAtTime(.001, end);
-        oscillator.connect(envelope); envelope.connect(master); voices.add(oscillator);
-        oscillator.onended = () => { voices.delete(oscillator); oscillator.disconnect(); envelope.disconnect(); };
-        oscillator.start(start); oscillator.stop(end + .02);
-      };
-      tick(); musicTimer = setInterval(tick, 500);
+    function ensureContext() {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) throw new Error("Web Audio indisponível");
+      if (context) return;
+      context = new Audio(); master = context.createGain();
+      master.gain.value = 0; master.connect(context.destination);
+      musicGain = context.createGain(); musicGain.gain.value = 0;
+      musicGain.connect(context.destination);
+      context.onstatechange = () => { label(); labelMusic(); };
     }
+    function labelMusic() {
+      const playing = Boolean(musicSource && context?.state === "running");
+      musicButton.textContent = musicBusy && musicWanted ? "♫ Preparando…" : playing ? "♫ Música ligada" : "♫ Ativar música";
+      musicButton.setAttribute("aria-pressed", String(playing));
+    }
+    function stopMusic() {
+      if (musicSource) { musicSource.stop(); musicSource.disconnect(); musicSource = null; }
+      labelMusic();
+    }
+    async function startMusic() {
+      if (!musicWanted || musicBusy || musicSource || document.hidden) return;
+      musicBusy = true;
+      try {
+        // Resume synchronously in the first click; decode the local MP3 afterwards.
+        ensureContext(); const resume = context.resume(); labelMusic(); await resume;
+        if (!musicBuffer) {
+          musicLoad ||= fetch("/assets/audio/arena-theme.mp3").then(response => {
+            if (!response.ok) throw new Error("Trilha indisponível");
+            return response.arrayBuffer();
+          }).then(bytes => context.decodeAudioData(bytes));
+          musicBuffer = await musicLoad;
+        }
+        if (!musicWanted || document.hidden || context.state !== "running") return;
+        musicSource = context.createBufferSource();
+        musicSource.buffer = musicBuffer; musicSource.loop = true;
+        musicSource.connect(musicGain);
+        musicGain.gain.setValueAtTime(ducked ? .08 : .35, context.currentTime);
+        musicSource.start();
+      } catch {
+        musicLoad = null; musicWanted = false;
+        musicButton.title = "Não foi possível tocar a música. Toque para tentar novamente.";
+      } finally { musicBusy = false; labelMusic(); }
+    }
+    musicButton.addEventListener("click", () => {
+      if (musicWanted && (musicSource || musicBusy)) { musicWanted = false; stopMusic(); }
+      else { musicWanted = true; void startMusic(); }
+    });
+    document.addEventListener?.("click", event => {
+      if (event.target !== musicButton && musicWanted) void startMusic();
+    });
     function play(kind) {
       if (!enabled || context?.state !== "running" || document.hidden) return;
       const now = performance.now(), cooldown = kind === "likes" ? 1000 : kind === "hit" ? 180 : 300;
@@ -119,9 +148,15 @@
     }
     button.addEventListener("click", toggle);
     document.addEventListener?.("visibilitychange", () => {
-      if (document.hidden && context) { enabled = false; stop(); master.gain.value = 0; label(); }
+      if (document.hidden && context) { enabled = false; stop(); stopMusic(); master.gain.value = 0; label(); }
+      else if (context && musicWanted) void startMusic();
     });
-    return { play, duck(active) { ducked = active; if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0; } };
+    return { play, duck(active) {
+      ducked = active;
+      if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0;
+      if (musicGain) musicGain.gain.setTargetAtTime(active ? .08 : .35, context.currentTime, .12);
+    } };
+
   })();
   let voiceEnabled = false, voiceStarting = false, voiceWanted = true, voiceAudio = null, autoVoiceTried = false;
   const voiceButton = $("voiceToggle");
