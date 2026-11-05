@@ -32,4 +32,4 @@ EulerStream continua como provedor do handshake WebSocket comunitário. Isto nã
 - [Documentação oficial: configuração e eventos](https://github.com/zerodytrash/TikTok-Live-Connector).
 - [EulerStream: Community e rotas Business](https://www.eulerstream.com/pricing).
 
-A publicação só deve ser considerada concluída após deploy `live` e fingerprint `d78097bb08ff` no `/api/health`. Estar publicado não comprova `connected: true` nem recebimento de presente real.
+A publicação só deve ser considerada concluída após deploy `live` e fingerprint `978e4915b4da` no `/api/health`. Estar publicado não comprova `connected: true` nem recebimento de presente real.
