@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `cda76f3d7a2b` |
+| Impressão digital do código | `801dd3ccb954` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -160,3 +160,8 @@ Em 05/11/2026, o usuário autorizou usar o principal, substituindo a restrição
 ### Estado confirmado após publicação
 
 A versão com Piper já foi publicada no serviço principal e testada por HTTP/navegador. Relatório factual, métricas e pendências: [render-piper-live.md](render-piper-live.md). O plano continua Free. A produção não está mais limitada à versão antiga citada nos registros históricos acima.
+
+
+### Ensaio remoto antes da live
+
+O usuário pediu testes pelo iPhone, antes de transmitir. Novo modo isolado em `/#teste`, também aberto ao segurar o título por 2 segundos, com botões fixos na tela e selo de ensaio. Não libera o `/api/demo` público nem permite manipular a batalha de outras pessoas. Voz tenta tocar automaticamente e comentários vêm marcados/habilitados; gesto pode continuar obrigatório pelo iOS. Leia [teste-iphone.md](teste-iphone.md) para o que foi comprovado e o que ainda depende de uma live real conectada. A conta e falha de conexão agora aparecem no diagnóstico para não confundir uma simulação com recepção real de presentes.

@@ -5,7 +5,14 @@
   const W = canvas.width, H = canvas.height;
   const socket = io();
   const characters = window.BattleCharacters;
-  let state = null;
+  let state = null, liveState = null, rehearsal = null;
+  let rehearsalMode = window.location?.hash === '#teste';
+  let rehearsalTimer = null;
+  const localEvents = Object.create(null);
+  const listen = (name, handler) => {
+    localEvents[name] = handler;
+    socket.on(name, data => { if (!rehearsalMode) handler(data); });
+  };
   let sprites = new Map(), fallen = [], particles = [], rings = [];
   let sceneId = null, lastFrame = performance.now();
   let tick = 0;
@@ -96,16 +103,17 @@
     });
     return { play, duck(active) { if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0; } };
   })();
-  let voiceEnabled = false, voiceStarting = false, voiceAudio = null;
+  let voiceEnabled = false, voiceStarting = false, voiceWanted = true, voiceAudio = null, autoVoiceTried = false;
   const voiceButton = $("voiceToggle");
-  function stopVoice() {
+  function stopVoice(blocked = false) {
     voiceEnabled = false; voiceAudio?.pause(); sound.duck(false);
     voiceButton.textContent = state?.narrationAvailable ? "Ativar voz" : "Voz não configurada";
     voiceButton.setAttribute?.("aria-pressed", "false");
+    $("voiceUnlock").hidden = !blocked || !voiceWanted;
   }
-  voiceButton.addEventListener("click", async () => {
+  async function enableVoice() {
     if (voiceStarting) return;
-    if (voiceEnabled) { stopVoice(); return; }
+    if (voiceEnabled) return;
     if (!state?.narrationAvailable || !window.Audio) return;
     voiceStarting = true; voiceButton.disabled = true; voiceButton.textContent = "Preparando voz…";
     try {
@@ -113,18 +121,29 @@
         voiceAudio = new window.Audio(); voiceAudio.volume = .85;
         voiceAudio.onplaying = () => sound.duck(true);
         voiceAudio.onended = () => sound.duck(false);
-        voiceAudio.onerror = stopVoice;
+        voiceAudio.onerror = () => stopVoice(true);
       }
       // Unlock this exact media element with a real user gesture (required by iOS).
       voiceAudio.src = "/api/narration/sample";
       await voiceAudio.play();
       if (document.hidden) { stopVoice(); return; }
-      voiceEnabled = true; voiceButton.textContent = "Silenciar voz";
+      voiceEnabled = true; $("voiceUnlock").hidden = true; voiceButton.textContent = "Silenciar voz";
       voiceButton.setAttribute?.("aria-pressed", "true");
-    } catch { stopVoice(); }
+    } catch { stopVoice(true); }
     finally { voiceStarting = false; voiceButton.disabled = !state?.narrationAvailable; }
+  }
+  voiceButton.addEventListener('click', () => {
+    if (voiceStarting) return;
+    if (voiceEnabled) { voiceWanted = false; stopVoice(); }
+    else { voiceWanted = true; void enableVoice(); }
   });
-  document.addEventListener?.("visibilitychange", () => { if (document.hidden) stopVoice(); });
+  $('rehearsalVoice').addEventListener('click', () => voiceButton.click());
+  $('unlockVoice').addEventListener('click', () => { voiceWanted = true; void enableVoice(); });
+  document.addEventListener?.('pointerdown', event => {
+    if (event.target === voiceButton || event.target === $('unlockVoice')) return;
+    if (voiceWanted && !voiceEnabled && !voiceStarting) void enableVoice();
+  });
+  document.addEventListener?.("visibilitychange", () => { if (document.hidden) stopVoice(); else if (voiceWanted) void enableVoice(); });
   function number(value) { return Math.round(Number(value) || 0).toLocaleString("pt-BR"); }
   function update(stateArg) {
     if (state && state.battleId === stateArg.battleId) {
@@ -135,6 +154,9 @@
     state = stateArg;
     voiceButton.disabled = !state.narrationAvailable || voiceStarting;
     if (!voiceEnabled && !voiceStarting) voiceButton.textContent = state.narrationAvailable ? "Ativar voz" : "Voz não configurada";
+    if (!autoVoiceTried && state.narrationAvailable) { autoVoiceTried = true; void enableVoice(); }
+    $('rehearsalVoice').disabled = !state.narrationAvailable || voiceStarting;
+    $('rehearsalVoice').textContent = voiceStarting ? 'Preparando…' : voiceEnabled ? 'Silenciar voz' : 'Liberar voz';
     syncCombat(stateArg);
     $("yellowHpText").textContent = number(state.hp.yellow);
     $("blueHpText").textContent = number(state.hp.blue);
@@ -151,7 +173,7 @@
     $("energyFill").style.width = state.energy + "%";
     $("energyText").textContent = Math.floor(state.energy) + "%";
     $("energyFlag").textContent = state.connected ? "🔴 AO VIVO" : "FANMADE";
-    $("liveStatus").textContent = state.connected ? "TIKTOK CONECTADO" : (state.configured ? "AGUARDANDO LIVE" : "MODO TESTE");
+    $("liveStatus").textContent = state.rehearsal ? "ENSAIO SEM DOAÇÃO REAL" : state.connected ? "TIKTOK CONECTADO" : (state.connectionError ? "TIKTOK DESCONECTADO" : state.configured ? "AGUARDANDO LIVE" : "MODO TESTE");
     document.querySelector(".live-dot").classList.toggle("connected", state.connected);
     $("viewerCount").textContent = state.viewers ? "👥 " + number(state.viewers) : "⚡ BATALHA INTERATIVA";
     const powered = Date.now() < state.powerUntil;
@@ -176,12 +198,18 @@
       $("winBanner").classList.toggle("blue-winner", state.winner === "blue");
     } else $("winBanner").hidden = true;
   }
+  function diagnostics(data) {
+    $('connectionDiagnostic').textContent = data.connected
+      ? 'TikTok conectado: @' + (data.channel || '') + '. Ensaio continua separado da batalha real.'
+      : 'Conexão real: ' + (data.channel ? '@' + data.channel + ' · ' : '') + (data.connectionError || 'Aguardando live pública no TikTok. PRISM em prévia não conecta os presentes.');
+  }
   socket.on("init", data => {
-    $("demoPanel").hidden = !data.demo;
-    update(data);
+    liveState = data;
+    $("demoPanel").hidden = rehearsalMode || !data.demo;
+    if (rehearsalMode) void startRehearsal(data); else update(data);
   });
-  socket.on("state", update);
-  socket.on("announcement", data => {
+  socket.on('state', data => { liveState = data; if (!rehearsalMode) update(data); else diagnostics(data); });
+  listen("announcement", data => {
     if (data.team !== "yellow" && data.team !== "blue") return;
     if (data.kind === "comment" && !$("readComments").checked) return;
     if (announcementQueue.length >= 8) {
@@ -192,17 +220,17 @@
     }
     announcementQueue.push(data);
   });
-  socket.on("attack", data => {
+  listen("attack", data => {
     if (data.kind === "gift") sound.play("gift");
     if (reducedMotion.matches) return;
     rings.push({ x: data.team === "yellow" ? 151 : 389, y: 398, life: 35,
       color: data.team === "yellow" ? "#fbd871" : "#7fd7ff" });
     if (rings.length > 20) rings.shift();
   });
-  socket.on("likes", () => { sound.play("likes"); for (let i = 0; i < 8; i++) spark(270, 220, "#c7d5ff"); });
-  socket.on("power", () => { sound.play("power"); for (let i = 0; i < 35; i++) spark(270, 330, "#ffed94"); });
-  socket.on("win", data => { sound.play(data.winner === "draw" ? "draw" : "win"); for (let i = 0; i < 90; i++) spark(Math.random() * W, Math.random() * 200 + 50, i % 2 ? "#f9c952" : "#7fbaff"); });
-  socket.on("reset", () => { sound.play("reset"); sprites.clear(); fallen = []; particlePool.push(...particles); particles = []; rings = []; damageLabels.length = 0; sceneId = null; $("giftNotice").hidden = true; });
+  listen("likes", () => { sound.play("likes"); for (let i = 0; i < 8; i++) spark(270, 220, "#c7d5ff"); });
+  listen("power", () => { sound.play("power"); for (let i = 0; i < 35; i++) spark(270, 330, "#ffed94"); });
+  listen("win", data => { sound.play(data.winner === "draw" ? "draw" : "win"); for (let i = 0; i < 90; i++) spark(Math.random() * W, Math.random() * 200 + 50, i % 2 ? "#f9c952" : "#7fbaff"); });
+  listen("reset", () => { sound.play("reset"); sprites.clear(); fallen = []; particlePool.push(...particles); particles = []; rings = []; damageLabels.length = 0; sceneId = null; $("giftNotice").hidden = true; });
   document.querySelectorAll("[data-action]").forEach(button => {
     button.addEventListener("click", async () => {
       button.disabled = true;
@@ -214,6 +242,60 @@
       finally { button.disabled = false; }
     });
   });
+  async function startRehearsal(data) {
+    $('rehearsalBanner').hidden = false; $('rehearsalPanel').hidden = false;
+    document.body.append($('rehearsalPanel'));
+    document.body.classList.add('rehearsal-mode');
+    try {
+      const [{ Battle }, { createRehearsal }] = await Promise.all([import('/testing/battle.mjs'), import('/rehearsal.mjs')]);
+      rehearsal = createRehearsal({ Battle, initial: data, onState: update, onEvent(name, value) {
+        if (name === 'reset') { announcementQueue.length = 0; nextAnnouncementAt = 0; giftUntil = 0; voiceAudio?.pause(); sound.duck(false); }
+        localEvents[name]?.(value);
+      } });
+      rehearsalTimer = setInterval(() => rehearsal?.tick(), 100);
+      diagnostics(data);
+    } catch { $('rehearsalResult').textContent = 'Não foi possível carregar o ensaio. Atualize a página.'; }
+  }
+  document.querySelectorAll('[data-rehearsal]').forEach(button => button.addEventListener('click', async () => {
+    if (!rehearsal) return;
+    button.disabled = true; let voiceMissing = false; $('rehearsalResult').textContent = 'Preparando teste e voz…';
+    try {
+      const action = button.dataset.rehearsal;
+      if (action === 'reset') rehearsal.reset();
+      else if (action === 'likes') rehearsal.likes();
+      else if (action === 'victory') rehearsal.victory();
+      else {
+        const kind = action === 'yellow' ? 'flower' : action === 'blue' ? 'rose' : action;
+        const response = await fetch('/api/rehearsal/' + kind);
+        if (!response.ok) throw Error('fixture');
+        const fixture = await response.json(); voiceMissing = !fixture.audioUrl;
+        if (action === 'comment') rehearsal.comment(fixture);
+        else rehearsal.gift(fixture, action === 'yellow' || action === 'blue' ? 19 : fixture.count);
+      }
+      $('rehearsalResult').textContent = voiceMissing ? 'Teste de imagem executado. A voz não ficou pronta; aguarde e tente novamente.' : 'Teste executado só neste aparelho. Confira imagem, balão e voz no PRISM.';
+    } catch { $('rehearsalResult').textContent = 'Não foi possível preparar o teste. Aguarde e tente novamente.'; }
+    finally { button.disabled = false; }
+  }));
+  const brand = document.querySelector?.('.brandline');
+  let hold;
+  brand?.addEventListener('pointerdown', () => {
+    if (rehearsalMode) return;
+    hold = setTimeout(() => {
+      rehearsalMode = true; window.history.replaceState(null, '', '#teste');
+      sprites.clear(); fallen = []; announcementQueue.length = 0; nextAnnouncementAt = 0; giftUntil = 0;
+      if (liveState) void startRehearsal(liveState);
+    }, 2000);
+  });
+  $('exitRehearsal').addEventListener('click', event => {
+    event.preventDefault(); rehearsalMode = false; rehearsal = null; clearInterval(rehearsalTimer);
+    window.history.replaceState(null, '', window.location.pathname);
+    $('rehearsalPanel').hidden = true; $('rehearsalBanner').hidden = true;
+    document.body.classList.remove('rehearsal-mode');
+    announcementQueue.length = 0; nextAnnouncementAt = 0; giftUntil = 0;
+    voiceAudio?.pause(); sound.duck(false); localEvents.reset?.({});
+    if (liveState) { update(liveState); $('demoPanel').hidden = !liveState.demo; }
+  });
+  for (const event of ['pointerup', 'pointercancel', 'pointerleave']) brand?.addEventListener(event, () => clearTimeout(hold));
   function rnd(min, max) { return min + Math.random() * (max - min); }
   function syncCombat(data) {
     const now = performance.now();
@@ -327,9 +409,9 @@
         $("giftNotice").classList.toggle("blue", data.team === "blue");
         const duration = voiceEnabled && data.audioUrl ? Math.max(5000, Math.min(30000, data.audioDuration * 1000 + 500)) : 5000;
         giftUntil = now + duration; nextAnnouncementAt = now + duration + 500;
-        if (voiceEnabled && voiceAudio && /^\/api\/narration\/[a-f0-9-]{36}$/.test(data.audioUrl || "")) {
+        if (voiceEnabled && voiceAudio && /^\/api\/narration\/(?:[a-f0-9-]{36}|rehearsal-(?:rose|flower|star|comment))$/.test(data.audioUrl || "")) {
           voiceAudio.src = data.audioUrl;
-          void voiceAudio.play().catch(stopVoice);
+          void voiceAudio.play().catch(() => stopVoice(true));
         }
       }
     }

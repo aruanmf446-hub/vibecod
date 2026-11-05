@@ -6,17 +6,23 @@ const cheers = {
   yellow: ['Vingadores, avante!', 'Time amarelo, vamos à batalha!', 'Os Vingadores agradecem o reforço!'],
   blue: ['A mim, meus X-Men!', 'Time azul, vamos à batalha!', 'Os X-Men agradecem o reforço!']
 };
+export function announcementFor(input, index = 0) {
+  if (!cheers[input.team]) return null;
+  if (!Number.isInteger(index) || index < 0 || index > 2) index = 0;
+  const data = { kind: input.kind === 'comment' ? 'comment' : 'gift', team: input.team,
+    name: cleanSpeech(input.name, 28) || 'Visitante', gift: cleanSpeech(input.gift, 60),
+    message: cleanSpeech(input.message), count: Math.max(0, Math.floor(Number(input.count) || 0)) };
+  const label = { rose: 'pela rosa', rosa: 'pela rosa', flower: 'pela flor', flor: 'pela flor', star: 'pela estrela', estrela: 'pela estrela' }[data.gift.toLowerCase()] || `pelo presente ${data.gift}`;
+  return { ...data, phrase: cheers[data.team][index], speech: data.kind === 'gift'
+    ? `Obrigado, ${data.name}, ${label}! ${cheers[data.team][index]}`
+    : `${data.name} comentou: ${data.message}. ${cheers[data.team][index]}` };
+}
 export function createAnnouncer({ emit, apiKey = '', model = 'llama-3.3-70b-versatile', fetcher = globalThis.fetch, now = Date.now }) {
   let busy = false, nextRequest = 0;
   return function announce(input) {
     if (!cheers[input.team]) return;
-    const data = { kind: input.kind === 'comment' ? 'comment' : 'gift', team: input.team,
-      name: cleanSpeech(input.name, 28) || 'Visitante', gift: cleanSpeech(input.gift, 60),
-      message: cleanSpeech(input.message), count: Math.max(0, Math.floor(Number(input.count) || 0)) };
-    const giftLabel = { rose: 'pela rosa', rosa: 'pela rosa', flower: 'pela flor', flor: 'pela flor', star: 'pela estrela', estrela: 'pela estrela' }[data.gift.toLowerCase()] || `pelo presente ${data.gift}`;
-    const send = index => emit('announcement', { ...data, phrase: cheers[data.team][index],
-      speech: data.kind === 'gift' ? `Obrigado, ${data.name}, ${giftLabel}! ${cheers[data.team][index]}` :
-        `${data.name} comentou: ${data.message}. ${cheers[data.team][index]}` });
+    const data = announcementFor(input);
+    const send = index => emit('announcement', announcementFor(data, index));
     // At most one short Groq request per ten seconds, independent of spectator count.
     // Groq selects a predefined cheer; it cannot inject arbitrary text or alter the battle.
     if (!apiKey || busy || now() < nextRequest || data.kind === 'comment') { send(0); return; }
