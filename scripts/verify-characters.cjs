@@ -31,7 +31,12 @@ const base = process.env.GAME_URL || 'http://127.0.0.1:3000';
   context.on('page', page => {
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
-    page.on('requestfailed', request => failed.push(request.url()));
+    page.on('requestfailed', request => {
+      // Leaving/reloading a page may cancel the automatic narration media request.
+      // Keep genuine HTTP/network failures; a user/navigation cancellation is expected.
+      if (request.url().includes('/api/narration/') && request.failure()?.errorText === 'net::ERR_ABORTED') return;
+      failed.push(request.url());
+    });
   });
   const page=await context.newPage();
   await page.goto(base);await page.waitForFunction(()=>window.qaState?.combat);await page.evaluate(()=>BattleCharacters.ready);

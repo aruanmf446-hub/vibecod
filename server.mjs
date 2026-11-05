@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { createPiperTts } from "./narration.mjs";
-import { createAnnouncer } from "./announcer.mjs";
+import { createAnnouncer, announcementFor } from "./announcer.mjs";
 import { randomUUID } from "node:crypto";
 import { Battle, COMBAT, reinforcementCount } from "./battle.mjs";
 import { buildInfo } from "./version.mjs";
@@ -20,11 +20,18 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const narration = createPiperTts({ root, enabled: process.env.PIPER_ENABLED === "true" || (Boolean(process.env.RENDER) && process.env.PIPER_ENABLED !== "false"),
   python: process.env.PIPER_PYTHON || (process.env.RENDER ? path.join(root, ".piper/venv/bin/python") : "python3"),
   model: process.env.PIPER_MODEL || (process.env.RENDER ? path.join(root, ".piper/voices/pt_BR-faber-medium.onnx") : "/opt/piper/voices/pt_BR-faber-medium.onnx"),
-  comments: process.env.PIPER_COMMENTS === "true" });
+  comments: process.env.PIPER_COMMENTS !== "false" });
 process.once?.("exit", () => narration.close());
 const announce = createAnnouncer({ emit: (event, data) => narration.publish(data, ready => io.emit(event, ready)),
   apiKey: process.env.GROQ_API_KEY || "", model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile" });
+const rehearsalFixtures = Object.freeze({
+  rose: announcementFor({ team: 'blue', kind: 'gift', name: 'Lucas', gift: 'Rosa', count: 1 }),
+  flower: announcementFor({ team: 'yellow', kind: 'gift', name: 'Lucas', gift: 'Flor', count: 1 }),
+  star: announcementFor({ team: 'blue', kind: 'gift', name: 'Júnior', gift: 'Estrela', count: 1 }),
+  comment: announcementFor({ team: 'yellow', kind: 'comment', name: 'Maria', message: 'Vai, Vingadores! Vamos vencer essa batalha!' })
+});
 let lastSpokenComment = 0;
+let connectionError = '';
 const LIMIT = 1200;
 const AUTO_RESTART = process.env.AUTO_RESTART !== "false";
 const teamOf = new Map();
@@ -60,7 +67,7 @@ function freshMatch() {
 }
 function publicState() {
   return {
-    ...match, narrationAvailable: narration.enabled, combat: battle.snapshot(), autoRestart: AUTO_RESTART,
+    ...match, channel: USERNAME, connectionError, narrationComments: process.env.PIPER_COMMENTS !== "false", narrationAvailable: narration.enabled, combat: battle.snapshot(), autoRestart: AUTO_RESTART,
     nextReinforcements: pendingReinforcements.reduce((total, r) => total + reinforcementCount(r.value, r.kind), 0),
     news: lastNews, configured: Boolean(USERNAME),
     leaderboard: Object.fromEntries(["yellow", "blue"].map(team => [
@@ -200,15 +207,28 @@ function receiveLikes(raw) {
 }
 app.use(express.json({ limit: "8kb" }));
 app.use(express.static(path.join(root, "public")));
+// Read-only fixtures: no endpoint here changes the public battle or accepts arbitrary text.
+app.get('/testing/battle.mjs', (_req, res) => res.sendFile(path.join(root, 'battle.mjs')));
+app.get('/api/rehearsal/:kind', async (req, res) => {
+  const fixture = Object.hasOwn(rehearsalFixtures, req.params.kind) ? rehearsalFixtures[req.params.kind] : null;
+  if (!fixture) return res.status(404).end();
+  const key = 'rehearsal-' + req.params.kind;
+  const wav = await narration.sample(key, fixture.speech);
+  res.set('Cache-Control', 'no-store');
+  res.json({ ...fixture, rehearsal: true, audioUrl: wav ? '/api/narration/' + key : null, audioDuration: narration.sampleDuration(key) });
+});
 app.get("/api/narration/:id", async (req, res) => {
-  const audio = req.params.id === "sample" ? await narration.sample() : narration.get(req.params.id);
+  const id = req.params.id;
+  const kind = id.startsWith('rehearsal-') ? id.slice(10) : '';
+  const fixture = Object.hasOwn(rehearsalFixtures, kind) ? rehearsalFixtures[kind] : null;
+  const audio = id === 'sample' ? await narration.sample() : fixture ? await narration.sample(id, fixture.speech) : narration.get(id);
   if (!audio) return res.status(404).end();
   res.set("Content-Type", "audio/wav"); res.set("Cache-Control", "private, max-age=60");
   res.set("X-Content-Type-Options", "nosniff"); res.send(audio);
 });
 app.get("/api/health", (_req, res) => res.json({
   ok: true, configured: !!USERNAME, connected: match.connected, battleId: match.battleId,
-  status: match.status, units: match.units, hp: match.hp, build, live
+  channel: USERNAME, connectionError, narration: { enabled: narration.enabled, comments: process.env.PIPER_COMMENTS !== "false" }, status: match.status, units: match.units, hp: match.hp, build, live
 }));
 // Simulação apenas para navegador no próprio computador, nunca liberada na internet.
 // Em hospedagem (Render etc.) o proxy do host conecta como endereço local, então o
@@ -275,13 +295,14 @@ async function connectLive() {
     });
     connection.on("error", err => console.warn("TikTok:", err?.message || err));
     await connection.connect();
-    match.connected = true;
+    match.connected = true; connectionError = "";
     live.connectedAt = new Date().toISOString();
     lastNews = "TikTok LIVE conectada! @" + USERNAME;
     console.log("TikTok LIVE conectada: @" + USERNAME);
     publish();
   } catch (error) {
     match.connected = false;
+    connectionError = "Não foi possível conectar à live. Confira a conta e se a transmissão TikTok está pública e ativa.";
     console.warn("LIVE indisponível: " + String(error?.message || error));
     publish();
     scheduleReconnect();

@@ -6,14 +6,14 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Battle, COMBAT, reinforcementCount } from '../battle.mjs';
-import { createAnnouncer } from '../announcer.mjs';
+import { createAnnouncer, announcementFor } from '../announcer.mjs';
 import { createPiperTts } from '../narration.mjs';
 function harness(env={}) {
   let now=10000, id=0;const timers=[],intervals=[],emissions=[],connections=[],routes={};
   const app={use(){},get(name,fn){routes[name]=fn},post(name,fn){routes[name]=fn}};
   const express=()=>app;express.json=()=>{};express.static=()=>{};
   class Live extends EventEmitter { constructor(){super();connections.push(this)}async connect(){} }
-  const sandbox={createPiperTts,createAnnouncer,Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
+  const sandbox={createPiperTts,createAnnouncer,announcementFor,Battle,COMBAT,reinforcementCount,buildInfo:()=>({commit:'teste',fingerprint:'teste'}),express,createServer:()=>({listen(){}}),
     Server:class{on(){}emit(name,data){emissions.push({name,data})}},fileURLToPath,path,
     randomUUID:()=>String(++id),process:{env},console:{log(){},warn(){}},
     TikTokLiveConnection:Live,Date:class extends Date{constructor(...a){super(...(a.length?a:[now]))}static now(){return now}},performance:{now:()=>now},
@@ -102,4 +102,32 @@ test('balões de presentes não duplicam combos; comentários não mudam regras'
  h.receiveChat({user:{uniqueId:'donor',nickname:'Lucas'},comment:'Vamos ganhar!'});
  assert.equal(JSON.stringify(h.publicState().units),before);
  assert.ok(h.emissions.some(e=>e.name==='announcement'&&e.data.kind==='comment'));
+});
+
+test('fixtures remotas são leitura e não alteram batalha/contadores reais',async()=>{
+ const h=harness({RENDER:'true',PIPER_ENABLED:'false'});const before=JSON.stringify(h.publicState());
+ let body;
+ await h.routes['/api/rehearsal/:kind']({params:{kind:'rose'}},{set(){},json:b=>body=b,status(){return this},end(){}});
+ assert.equal(body.team,'blue');assert.equal(body.name,'Lucas');assert.match(body.speech,/rosa.*X-Men/);
+ assert.equal(JSON.stringify(h.publicState()),before);
+ let status;
+ await h.routes['/api/rehearsal/:kind']({params:{kind:'__proto__'}},{status:s=>{status=s;return {end(){}}}});
+ assert.equal(status,404);
+});
+
+test('eventos da conexão TikTok identificam doador, combo, time e agradecimento',async()=>{
+ const h=harness({TIKTOK_USERNAME:'canal'});await h.connectLive();const connection=h.connections[0];
+ const user={uniqueId:'lucas',nickname:'Lucas'};
+ connection.emit('chat',{user,comment:'1'});
+ connection.emit('gift',{user,giftName:'Rose',diamondCount:1,repeatCount:3,giftType:1,repeatEnd:false});
+ assert.equal(h.publicState().units.blue,0);
+ connection.emit('gift',{user,giftName:'Rose',diamondCount:1,repeatCount:3,giftType:1,repeatEnd:true});
+ assert.equal(h.publicState().units.blue,3);
+ const rose=h.emissions.filter(e=>e.name==='announcement'&&e.data.kind==='gift').at(-1).data;
+ assert.equal(rose.name,'Lucas');assert.equal(rose.count,3);assert.match(rose.speech,/Lucas.*rosa.*X-Men/);
+ connection.emit('chat',{user,comment:'2'});
+ connection.emit('gift',{user,giftName:'Star',diamondCount:1,repeatCount:1});
+ const star=h.emissions.filter(e=>e.name==='announcement'&&e.data.kind==='gift').at(-1).data;
+ assert.equal(star.team,'blue');assert.match(star.speech,/Lucas.*estrela.*X-Men/);
+ assert.equal(h.publicState().narrationComments,true);
 });
