@@ -36,7 +36,7 @@ Como comparar:
 
 | Item | Valor |
 |---|---|
-| Impressão digital do código | `e427647504b9` |
+| Impressão digital do código | `cda76f3d7a2b` |
 
 (Documentação e testes não entram na impressão digital, então commits que só mudam docs não alteram esse valor.)
 
@@ -102,3 +102,57 @@ No Render (variável `RENDER`, definida pelo próprio Render) ou em qualquer req
 - O WebSocket pelo IP foi bloqueado pela rede do ambiente de nuvem, mas o servidor aceita a conexão (resposta 101 testada direto) e o Socket.IO continuou funcionando por polling.
 
 **Não testado:** iPhone físico, app PRISM, widget Web do PRISM, RTMP, live real do TikTok, presentes reais e o computador Windows onde o jogo roda.
+
+
+## Prévia visual — branch `visual-polish` (sem publicação)
+
+Esta proposta parte de `claude/torres-production-validation-969pba`, informado como origem do Render em https://batalha-torres.onrender.com. As instruções anteriores sobre hospedagem local são um registro histórico. Não atualizar o branch de produção durante a live: revisar e integrar o PR em uma janela combinada.
+
+Mudanças somente de apresentação: margem à direita para os controles do TikTok, cabeçalho compacto, HP e pontos maiores, rankings compactos, aviso de presente com nome/presente/reforços, faíscas e números derivados do HP recebido, tremor curto da torre, confete por time e contagem visual de reinício. Os 14 assets, torres, coordenadas do combate e servidor permanecem intactos. O contador é uma estimativa visual dos 10 segundos existentes; entrar no meio da comemoração pode mostrar um tempo diferente do restante real. O servidor continua decidindo o reinício.
+
+Canvas com densidade limitada a 2, cenário estático em cache, partículas reaproveitadas com teto de 120 e números de dano com teto de 24. Movimento reduzido desliga partículas, tremores e giros de derrota. Não há dependências, fontes ou assets remotos novos.
+
+QA: `npm run check`, 21 testes e script existente `scripts/verify-characters.cjs`. Capturas novas em `visual-390x844.png`, `visual-720x1280.png`, `visual-1080x1920.png` e `visual-ip.png`; comparar com `duels-mobile.png`, `duels-arena.png` e `prism-iphone-ip.png`, mantidos sem alteração. Nas três resoluções, o limite inferior da arena ficou em 472/813/1093 px, abaixo dos limites seguros estimados de 591/896/1344 px. A margem é uma aproximação: a sobreposição do TikTok varia com aparelho e modo de captura.
+
+Não testados: iPhone físico, 60 fps em hardware móvel, PRISM, RTMP e live real. Sem deploy ou merge automático. A impressão digital da tabela acima corresponde à proposta visual, não à versão atualmente transmitida.
+
+
+### Revisão do cenário conforme a referência aprovada
+
+O céu abstrato e o piso de grade foram substituídos por um jardim de batalha verde com muralha de pedra, bandeiras botânicas dos times, tochas, rochas, vegetação e cristais. Arte vetorial original local em `public/assets/arena/garden.svg` (36 KB), sem imagens externas. A imagem é rasterizada uma vez em cache de 2×; torres e personagens não fazem parte do fundo, e suas posições/desenhos permanecem iguais. As capturas `visual-*` foram atualizadas para esta revisão. A fila foi posicionada acima da borda de pedra.
+
+
+### Efeitos sonoros
+
+Antes não existia áudio. `public/game.js` agora sintetiza efeitos originais via Web Audio para presentes, golpes, dano à torre, derrota de unidades, curtidas, modo poder, vitória/empate e reinício. Sem downloads de áudio, bibliotecas ou música contínua. Um único AudioContext é reutilizado; há limite de 12 vozes, cooldown por efeito, volume moderado e desconexão dos nós ao terminar.
+
+O botão **Ativar som / Silenciar** libera o áudio por toque e permite interromper inclusive sons já agendados. Nada toca antes desse gesto, nem ao reconectar/recarregar. Ao ocultar a página, o áudio é interrompido; é preciso ativar de novo. Som e movimento reduzido são controles independentes.
+
+Validação adicional em Chromium: nenhum AudioContext criado antes do toque; forma de onda real medida após ativar (pico 0,0465), sons de presente e poder, silêncio sem novas vozes depois de silenciar, um único contexto reutilizado e página sem exceções ou overflow. Captura: `visual-sound.png`. `npm test` continua com 21 testes aprovados e `npm run check` passou.
+
+No iPhone, será necessário tocar em Ativar som em cada abertura. Não foi verificado se o widget Web do PRISM permite esse toque nem se sua configuração captura o áudio da página. A confirmação final precisa ser feita no PRISM/iPhone e na reprodução da live, sem presumir que áudio no Safari equivale a áudio transmitido.
+
+
+### Personagem com balão — narração externa pendente
+
+O pedido seguinte acrescentou um apresentador em PNG e balões de agradecimento/comentário. Após consultar https://console.groq.com/docs/text-to-speech (vozes documentadas em inglês e árabe, sem português), o usuário escolheu **serviço externo em português, com provedor a definir depois**. Portanto NÃO foi ativada voz de navegador nem integração TTS provisória. Os efeitos sonoros anteriores continuam separados. O balão mostra texto, mas ainda não fala nem movimenta a boca como se estivesse falando.
+
+- `public/assets/announcers/yellow.png` e `blue.png`: exportações transparentes dos personagens originais já existentes, herói tecnológico e soldado óptico.
+- `announcer.mjs`: agradecimento local pelo nome/presente/time. Opcionalmente, `GROQ_API_KEY` e `GROQ_MODEL` no servidor permitem ao Groq selecionar entre três frases locais de torcida. O modelo não altera o texto livre do comentário, não controla a batalha e não recebe o nome do participante. Uma requisição no máximo a cada 10 segundos, uma simultânea, timeout de 2 segundos e fallback local em falhas. Nenhum endpoint de geração foi exposto ao público; espectadores adicionais não multiplicam chamadas.
+- `server.mjs`: apenas emite eventos adicionais de apresentação para presentes completos e amostra comentários a cada 5 segundos. Contagem de combo, times, HP, invocações, regras e conexão permanecem iguais. Presentes durante comemoração recebem agradecimento no recebimento, sem repetir quando a batalha reinicia.
+- Cliente: fila de 8 balões, 5 segundos cada, prioriza presentes e descarta avisos antigos em excesso sem descartar unidades/doações do jogo. Comentários só aparecem ao marcar Mostrar comentários, inicialmente desligado. Texto é exibido com textContent, sem HTML executável; nomes/textos são limitados e controles/URLs removidos. Comentários crus não passam por moderação semântica: o operador decide habilitar a exibição.
+- Não configurar chave no HTML/JS público; somente variável do servidor. Sem chave, as frases locais funcionam e nenhuma API é chamada. A API real Groq não foi exercitada nesta etapa por falta de credencial: testes usaram respostas simuladas, incluindo falhas, saída inválida e limite de chamadas.
+
+Validação: 27 testes passaram, npm run check e node --check announcer.mjs passaram. QA de batalha completo passou; teste adicional com presentes reais do simulador conferiu Rosa → retrato azul/X-Men e Flor → amarelo/Vingadores, sem overflow ou exceções. Captura nova: visual-announcer.png. Para terminar a fala, escolher provedor TTS em português, configurar credencial somente no servidor e verificar desbloqueio/captura de áudio no iPhone/PRISM. Sem publicação no Render.
+
+
+### Atualização: Piper brasileiro preparado
+
+A pendência de voz externa da seção anterior foi implementada usando Piper local em CPU, sem API paga. Ver [docs/piper.md](piper.md), [ouvir exemplo](piper-example.wav) e [captura com voz](visual-piper.png). Botão Ativar voz separado dos efeitos; geração única por anúncio, cache e fila limitada. São 31 testes aprovados, QA completo do combate e teste real de WAV/reprodução no navegador. Docker construído e executado sem privilégios; os limites solicitados de CPU/memória não foram aplicados pelo ambiente de teste, portanto a viabilidade no Render Free ainda precisa ser confirmada no preview. O benchmark real do worker teve pico de 187,8 MB. Nada foi publicado ou alterado no Render.
+
+
+### Publicação autorizada no serviço principal
+
+Em 05/11/2026, o usuário autorizou usar o principal, substituindo a restrição anterior de manter tudo apenas em preview. O serviço `batalha-torres` continua no plano Free, runtime Node e mesmo URL. A documentação atual do Render confirma Python disponível no runtime Node. Assim, `npm install` executa `scripts/setup-piper.mjs` via postinstall para criar `.piper/venv` e baixar a voz no build, sem exigir mudança de runtime ou outro serviço. No Render o Piper fica ativo por padrão; `PIPER_ENABLED=false` desliga instalação/voz. Configurações da live são preservadas.
+
+`GET /api/narration/sample` gera uma frase fixa, compartilhada e em cache por 4 minutos, sem aceitar texto e sem afetar unidades/pontos. O toque em Ativar voz reproduz essa amostra real para verificar o áudio, e mostra Preparando voz durante o carregamento. 32 testes passaram, instalação nativa e reprodução real do WAV foram verificadas localmente. A publicação deve ser confirmada pelo commit/fingerprint no /api/health e pela resposta WAV no endereço público; aprovação de merge não é confirmação de deploy.

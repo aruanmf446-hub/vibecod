@@ -13,7 +13,7 @@
     <header class="top">
       <div class="topline"><span class="live-dot"></span><span id="liveStatus">MODO TESTE</span><span class="topline-right" id="viewerCount">⚡ BATALHA INTERATIVA</span></div>
       <div class="brandline"><span class="wingmark">✦</span><div><div class="eyebrow">TORRE DOS HERÓIS</div><h1><span>VINGADORES</span> <em>VS</em> <span>X-MEN</span></h1></div><span class="wingmark blue-glow">✧</span></div>
-      <div class="timerline"><span id="roundNo">0 × 0 EM CAMPO</span><strong id="clock">SEM LIMITE</strong><span id="energyFlag">LIVE FANMADE</span></div>
+      <div class="timerline"><span id="roundNo">0 × 0 EM CAMPO</span><strong id="clock">SEM LIMITE</strong><span id="energyFlag">LIVE FANMADE</span><button id="soundToggle" class="sound-toggle" type="button" aria-pressed="false" title="Ativar ou silenciar efeitos sonoros">Ativar som</button></div>
     </header>
     <section class="health">
       <div class="team-info yellow">
@@ -32,10 +32,16 @@
       <div id="combatQueue" class="combat-queue">Envie Flor ou Rosa para invocar combatentes</div>
       <canvas id="battle" width="540" height="650" role="img" aria-label="Arena animada com duas torres e pequenos super-heróis fanmade"></canvas>
       <div class="center-versus" aria-hidden="true">VS</div>
+      <div id="giftNotice" class="gift-notice announcer" role="status" hidden>
+        <img id="announcerPortrait" src="/assets/announcers/yellow.png" alt="" width="80" height="90">
+        <div class="speech-bubble"><strong id="announcerName"></strong><span id="announcerMessage"></span><small id="announcerDetail"></small></div>
+      </div>
+      <div id="victoryCountdown" class="victory-countdown" hidden></div>
       <div id="winBanner" class="win-banner" hidden></div>
       <div id="toast" class="toast">Escolha seu time no chat e entre na batalha!</div>
     </div>
     <div class="power-strip"><div><b>⚡ ENERGIA DA LIVE</b><span id="energyText">0%</span></div><div class="power-track"><div id="energyFill"></div></div></div>
+    <div class="comment-controls"><button id="voiceToggle" class="sound-toggle" type="button" aria-pressed="false" disabled title="Ativar a voz brasileira do Piper">Voz não configurada</button><label class="comment-reading"><input id="readComments" type="checkbox"> Mostrar comentários</label></div>
     <section class="instructions">
       <div class="guide yellow-guide"><div class="gift">🌼</div><div><strong>FLOR = VINGADORES</strong><small>Digite 1 para entrar no time amarelo</small></div></div>
       <div class="guide blue-guide"><div class="gift">🌹</div><div><strong>ROSA = X-MEN</strong><small>Digite 2 para entrar no time azul</small></div></div>

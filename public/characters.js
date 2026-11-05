@@ -100,7 +100,7 @@
     ctx.beginPath(); ctx.ellipse(0, 1, 12 * character.scale, 3, 0, 0, Math.PI * 2); ctx.fill();
     ctx.translate(0, bob);
     if (sprite.team === "blue") ctx.scale(-1, 1);
-    if (defeated) { ctx.globalAlpha = .45 * (1 - (sprite.deathProgress || 0)); ctx.rotate(.18 + (sprite.deathProgress || 0) * .6); }
+    if (defeated) { ctx.globalAlpha = .45 * (1 - (sprite.deathProgress || 0)); if (!reducedMotion.matches) ctx.rotate(.18 + (sprite.deathProgress || 0) * .6); }
     else if (hurt) { ctx.globalAlpha = .6; ctx.translate(-2, 0); }
     else if (!reducedMotion.matches) ctx.rotate(attacking ? Math.sin(time * 2) * .09 : Math.sin(time) * (sprite.idle ? .012 : .035));
     ctx.scale(character.scale * scalePulse, character.scale * scalePulse);

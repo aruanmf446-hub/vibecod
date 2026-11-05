@@ -1,4 +1,6 @@
 import "dotenv/config";
+import { createPiperTts } from "./narration.mjs";
+import { createAnnouncer } from "./announcer.mjs";
 import { randomUUID } from "node:crypto";
 import { Battle, COMBAT, reinforcementCount } from "./battle.mjs";
 import { buildInfo } from "./version.mjs";
@@ -15,6 +17,14 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer);
 const root = path.dirname(fileURLToPath(import.meta.url));
+const narration = createPiperTts({ root, enabled: process.env.PIPER_ENABLED === "true" || (Boolean(process.env.RENDER) && process.env.PIPER_ENABLED !== "false"),
+  python: process.env.PIPER_PYTHON || (process.env.RENDER ? path.join(root, ".piper/venv/bin/python") : "python3"),
+  model: process.env.PIPER_MODEL || (process.env.RENDER ? path.join(root, ".piper/voices/pt_BR-faber-medium.onnx") : "/opt/piper/voices/pt_BR-faber-medium.onnx"),
+  comments: process.env.PIPER_COMMENTS === "true" });
+process.once?.("exit", () => narration.close());
+const announce = createAnnouncer({ emit: (event, data) => narration.publish(data, ready => io.emit(event, ready)),
+  apiKey: process.env.GROQ_API_KEY || "", model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile" });
+let lastSpokenComment = 0;
 const LIMIT = 1200;
 const AUTO_RESTART = process.env.AUTO_RESTART !== "false";
 const teamOf = new Map();
@@ -50,7 +60,7 @@ function freshMatch() {
 }
 function publicState() {
   return {
-    ...match, combat: battle.snapshot(), autoRestart: AUTO_RESTART,
+    ...match, narrationAvailable: narration.enabled, combat: battle.snapshot(), autoRestart: AUTO_RESTART,
     nextReinforcements: pendingReinforcements.reduce((total, r) => total + reinforcementCount(r.value, r.kind), 0),
     news: lastNews, configured: Boolean(USERNAME),
     leaderboard: Object.fromEntries(["yellow", "blue"].map(team => [
@@ -150,12 +160,19 @@ function receiveGift(raw) {
   const name = giftName(raw);
   const team = teamFromGift(name) || teamFor(person.id);
   const diamonds = giftValue(raw);
+  announce({ kind: "gift", team, name: person.name, gift: name,
+    count: reinforcementCount(Math.max(8, Math.min(450, diamonds * 8)), "gift") });
   // Uma flor/rosa invoca reforços; presentes maiores adicionam mais combatentes.
   strike(team, person, Math.max(8, Math.min(450, diamonds * 8)), "gift", name);
 }
 function receiveChat(raw) {
   const person = actor(raw);
   const team = teamFromChat(raw?.comment ?? raw?.text);
+  const commentTime = Date.now();
+  if (commentTime - lastSpokenComment >= 5000) {
+    lastSpokenComment = commentTime;
+    announce({ kind: "comment", team: team || teamFor(person.id), name: person.name, message: raw?.comment ?? raw?.text });
+  }
   if (!team) return;
   teamOf.set(person.id, team);
   const now = Date.now();
@@ -183,6 +200,12 @@ function receiveLikes(raw) {
 }
 app.use(express.json({ limit: "8kb" }));
 app.use(express.static(path.join(root, "public")));
+app.get("/api/narration/:id", async (req, res) => {
+  const audio = req.params.id === "sample" ? await narration.sample() : narration.get(req.params.id);
+  if (!audio) return res.status(404).end();
+  res.set("Content-Type", "audio/wav"); res.set("Cache-Control", "private, max-age=60");
+  res.set("X-Content-Type-Options", "nosniff"); res.send(audio);
+});
 app.get("/api/health", (_req, res) => res.json({
   ok: true, configured: !!USERNAME, connected: match.connected, battleId: match.battleId,
   status: match.status, units: match.units, hp: match.hp, build, live
