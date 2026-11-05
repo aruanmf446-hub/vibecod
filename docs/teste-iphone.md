@@ -35,3 +35,11 @@ O servidor continua identificando comentários/presentes pela biblioteca `tiktok
 - QA do ensaio em Chromium com política de gesto obrigatório: rosa/flor/estrela/comentário, reprodução real WAV, modo poder, vitória/reinício; comparou estado/contadores da batalha principal antes/depois e confirmou nenhuma mutação, `/api/demo` 403, sem overflow/exceções.
 - Repetir com servidor hospedado simulado (`DISABLE_DEMO=true`, Piper habilitado): `GAME_URL=http://127.0.0.1:3012 PLAYWRIGHT_MODULE=/caminho/playwright node scripts/verify-phone-rehearsal.cjs`. Requer ausência de eventos reais para comparar snapshots idênticos.
 - Captura real de teste: `phone-rehearsal.png`. iPhone físico e PRISM não foram controlados neste ambiente.
+
+## Confirmação no endereço principal
+
+Publicado em 05/11/2026, deploy Render `dep-dblt9plckfvc739r0d0g`, commit `ecc9a27de059ef8a1a015b8b37176b75117c66a8`, fingerprint `801dd3ccb954`. `/api/health` confirmou `narration.enabled=true` e `narration.comments=true`.
+
+O QA remoto foi repetido contra https://batalha-torres.onrender.com e passou: abertura por long-press, presentes fixos, comentário com reprodução real do Piper, modos poder/vitória/reinício, saída do ensaio; HP, unidades, battleId e contadores reais do principal idênticos antes/depois. `/api/demo` continuou 403. Sem overflow ou exceções JavaScript. O script agora suporta o proxy do ambiente no contexto do navegador/API; nenhuma credencial é persistida.
+
+A conta configurada continuava desconectada e os contadores reais estavam zerados. Não foram enviados presentes pagos ou mensagens ao TikTok. A consulta HTTP pública ao TikTok não forneceu metadados de live verificáveis, então não foi usada como prova de conta offline/online. Falta confirmação da conta pelo operador e teste com a transmissão TikTok ativa. O app PRISM/iPhone físico não foi controlado por estas ferramentas; a reprodução/captura final deve ser conferida no próprio aparelho.
