@@ -7,6 +7,9 @@
   const characters = window.BattleCharacters;
   let state = null, liveState = null, rehearsal = null;
   let rehearsalMode = window.location?.hash === '#teste';
+  const localScreen = ['localhost', '127.0.0.1', '[::1]'].includes(window.location?.hostname || 'localhost');
+  function syncControls() { app.classList.toggle('controls-visible', localScreen || rehearsalMode); }
+  syncControls();
   let rehearsalTimer = null;
   const localEvents = Object.create(null);
   const listen = (name, handler) => {
@@ -34,7 +37,7 @@
   window.addEventListener?.("resize", resizeCanvas);
   resizeCanvas();
   const colors = { yellow: ["#ffb323", "#ffe084", "#c57322"], blue: ["#256cdb", "#90ddff", "#154a9f"] };
-  // Small original Web Audio cues. Nothing starts before an explicit tap.
+  // Broadcast audio starts automatically where the WebView permits; test controls stay separate.
   const sound = (() => {
     let context = null, master = null, enabled = false, ducked = false;
     let musicGain = null, musicBuffer = null, musicSource = null, musicLoad = null;
@@ -124,8 +127,17 @@
       else { musicWanted = true; void startMusic(); }
     });
     document.addEventListener?.("click", event => {
+      // A blocked automatic resume may still be pending; retry within this gesture.
+      if (context && context.state !== "running") void context.resume().catch(() => {});
       if (event.target !== musicButton && musicWanted) void startMusic();
     });
+    function startBroadcast() {
+      try {
+        ensureContext(); enabled = true; musicWanted = true;
+        master.gain.value = ducked ? .08 : .3;
+        void startMusic(); label();
+      } catch { label(); }
+    }
     function play(kind) {
       if (!enabled || context?.state !== "running" || document.hidden) return;
       const now = performance.now(), cooldown = kind === "likes" ? 1000 : kind === "hit" ? 180 : 300;
@@ -149,9 +161,10 @@
     button.addEventListener("click", toggle);
     document.addEventListener?.("visibilitychange", () => {
       if (document.hidden && context) { enabled = false; stop(); stopMusic(); master.gain.value = 0; label(); }
+      else if (context && !localScreen && !rehearsalMode) startBroadcast();
       else if (context && musicWanted) void startMusic();
     });
-    return { play, duck(active) {
+    return { play, startBroadcast, duck(active) {
       ducked = active;
       if (master) master.gain.value = enabled ? (active ? .08 : .3) : 0;
       if (musicGain) musicGain.gain.setTargetAtTime(active ? .08 : .35, context.currentTime, .12);
@@ -263,7 +276,8 @@
   socket.on("init", data => {
     liveState = data;
     $("demoPanel").hidden = rehearsalMode || !data.demo;
-    if (rehearsalMode) void startRehearsal(data); else update(data);
+    if (rehearsalMode) void startRehearsal(data);
+    else { update(data); if (!localScreen) sound.startBroadcast(); }
   });
   socket.on('state', data => { liveState = data; if (!rehearsalMode) update(data); else diagnostics(data); });
   listen("announcement", data => {
@@ -300,6 +314,7 @@
     });
   });
   async function startRehearsal(data) {
+    syncControls();
     $('openRehearsal').hidden = true;
     $('rehearsalBanner').hidden = false; $('rehearsalPanel').hidden = false;
     document.body.append($('rehearsalPanel')); document.body.append($('showRehearsalControls'));
@@ -349,15 +364,20 @@
     if (liveState) void startRehearsal(liveState);
   }
   $('openRehearsal').addEventListener('click', enterRehearsal);
-  brand?.addEventListener('pointerdown', () => { if (!rehearsalMode) hold = setTimeout(enterRehearsal, 2000); });
+  brand?.addEventListener('pointerdown', () => { if (localScreen && !rehearsalMode) hold = setTimeout(enterRehearsal, 2000); });
   $('exitRehearsal').addEventListener('click', event => {
     event.preventDefault(); rehearsalMode = false; rehearsal = null; clearInterval(rehearsalTimer);
     window.history.replaceState(null, '', window.location.pathname);
     $('rehearsalPanel').hidden = true; $('rehearsalBanner').hidden = true; $('showRehearsalControls').hidden = true; $('openRehearsal').hidden = false;
-    document.body.classList.remove('rehearsal-mode');
+    document.body.classList.remove('rehearsal-mode'); syncControls();
+    if (!localScreen) sound.startBroadcast();
     announcementQueue.length = 0; nextAnnouncementAt = 0; giftUntil = 0;
     voiceAudio?.pause(); sound.duck(false); localEvents.reset?.({});
     if (liveState) { update(liveState); $('demoPanel').hidden = !liveState.demo; }
+  });
+  window.addEventListener?.('hashchange', () => {
+    if (window.location.hash === '#teste' && !rehearsalMode) enterRehearsal();
+    else if (window.location.hash !== '#teste' && rehearsalMode) $('exitRehearsal').click();
   });
   for (const event of ['pointerup', 'pointercancel', 'pointerleave']) brand?.addEventListener(event, () => clearTimeout(hold));
   function rnd(min, max) { return min + Math.random() * (max - min); }
